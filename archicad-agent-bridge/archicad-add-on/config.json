@@ -1,0 +1,14 @@
+{
+    "addOnName": "AgentBridge",
+    "defaultLanguage": "INT",
+    "languages": [
+        "INT",
+        "JPN"
+    ],
+    "version": "0.1.0",
+    "copyright": {
+        "name": "AgentBridge",
+        "year": "2026"
+    },
+    "description": "Local JSON bridge for VS Code agents and Archicad automation"
+}

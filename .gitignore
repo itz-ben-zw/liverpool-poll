@@ -1,1 +1,6 @@
 node_modules/
+archicad-agent-bridge/API.Development.Kit.WIN.*.zip
+archicad-agent-bridge/archicad-add-on/Build/
+archicad-agent-bridge/devkit-28/
+archicad-agent-bridge/vscode-extension/dist/
+archicad-agent-bridge/vscode-extension/node_modules/

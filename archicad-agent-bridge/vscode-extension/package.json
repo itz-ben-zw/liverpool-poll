@@ -1,0 +1,100 @@
+{
+  "name": "archicad-agent-bridge",
+  "displayName": "Archicad Agent Bridge",
+  "description": "VS Code chat participant and agent tool for driving Archicad through AgentBridge.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "private": true,
+  "engines": {
+    "vscode": "^1.118.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onChatParticipant:archicad-agent-bridge.archicad",
+    "onLanguageModelTool:archicad_create_house_plan",
+    "onCommand:archicadAgent.createHousePlan"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "archicad-agent-bridge.archicad",
+        "name": "archicad",
+        "fullName": "Archicad Agent",
+        "description": "Create and update Archicad models",
+        "isSticky": true
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "archicad_create_house_plan",
+        "displayName": "Create Archicad House Plan",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "createHousePlan",
+        "icon": "$(home)",
+        "userDescription": "Creates a parametric starter house plan in the active Archicad file.",
+        "modelDescription": "Use this tool when the user asks to create a house, floor plan, residential layout, or multi-storey starter BIM model in Archicad. It sends dimensions and floor count to the local AgentBridge Archicad add-on. Do not use it for code-only tasks or when Archicad is not running.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "prompt": {
+              "type": "string",
+              "description": "The user's natural language request."
+            },
+            "width": {
+              "type": "number",
+              "description": "Overall building width in meters. Defaults to 12."
+            },
+            "depth": {
+              "type": "number",
+              "description": "Overall building depth in meters. Defaults to 9."
+            },
+            "floors": {
+              "type": "integer",
+              "description": "Number of floors. Defaults to 2."
+            },
+            "storyHeight": {
+              "type": "number",
+              "description": "Floor-to-floor height in meters. Defaults to 3."
+            }
+          },
+          "required": [
+            "prompt"
+          ]
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "archicadAgent.createHousePlan",
+        "title": "Archicad Agent Bridge: Create House Plan From Prompt"
+      }
+    ],
+    "configuration": {
+      "title": "Archicad Agent Bridge",
+      "properties": {
+        "archicadAgent.portStart": {
+          "type": "number",
+          "default": 19723,
+          "description": "First Archicad JSON Interface port to probe."
+        },
+        "archicadAgent.portEnd": {
+          "type": "number",
+          "default": 19743,
+          "description": "Last Archicad JSON Interface port to probe."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/vscode": "^1.118.0",
+    "typescript": "^5.9.0"
+  }
+}
