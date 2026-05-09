@@ -16,6 +16,19 @@ A simple website for Liverpool fans to vote whether Arne Slot should be sacked.
 4. Run `npm start`
 5. Open `http://localhost:3000` in your browser.
 
+## Deploying to a free public host
+This project is ready for free hosting services such as Render.
+
+### Render deployment
+1. Create a free Render account at https://render.com/
+2. Connect your GitHub repository or push this repository to GitHub.
+3. In Render, create a new Web Service and import this repo.
+4. Use the default `npm install` build command and `npm start` start command.
+5. Select the free plan.
+
+Render will give you a public URL where the app is hosted.
+
 ## Notes
 - The app uses a cookie plus the request IP to reduce repeated voting.
 - Total vote counts and percentages are visible to everyone.
+- Deploying to a cloud host removes the need to keep your PC running.
