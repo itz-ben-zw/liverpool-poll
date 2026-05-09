@@ -8,3 +8,9 @@ services:
     envVars:
       - key: PORT
         value: 3000
+
+databases:
+  - name: liverpool-poll-db
+    engine: postgres
+    version: "15"
+    plan: free

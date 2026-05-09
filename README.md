@@ -28,6 +28,16 @@ This project is ready for free hosting services such as Render.
 
 Render will give you a public URL where the app is hosted.
 
+## Persistent votes on Render
+This app now supports using a Postgres database for vote storage.
+
+### To keep votes permanently on Render
+1. In Render, add a free Postgres database service named `liverpool-poll-db`.
+2. In your web service settings, ensure `DATABASE_URL` is set automatically by Render.
+3. Redeploy the web service.
+
+If `DATABASE_URL` is present, the app will store votes in Postgres instead of `data/votes.json`.
+
 ## Notes
 - The app uses a cookie plus the request IP to reduce repeated voting.
 - Total vote counts and percentages are visible to everyone.
