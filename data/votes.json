@@ -1,6 +1,6 @@
 {
-  "sack": 103,
-  "keep": 21,
+  "sack": 10678,
+  "keep": 146,
   "voters": {
     "ip:::1": {
       "choice": "sack",
