@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vote: Should Liverpool sack Arne Slot?</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <h1>Liverpool Fan Poll</h1>
+      <p>Should Liverpool sack Arne Slot?</p>
+      <div class="badge">One vote per fan / Same device or IP cannot vote twice</div>
+    </section>
+
+    <section class="poll-card">
+      <div class="vote-buttons">
+        <button id="vote-sack" class="vote-btn sack">Sack Arne Slot</button>
+        <button id="vote-keep" class="vote-btn keep">Keep Arne Slot</button>
+      </div>
+
+      <div id="status" class="status">Loading poll data...</div>
+
+      <div class="results" aria-live="polite">
+        <div class="result-item">
+          <span>Sack</span>
+          <strong id="sack-count">0</strong>
+          <span id="sack-pct">0%</span>
+        </div>
+        <div class="result-item">
+          <span>Keep</span>
+          <strong id="keep-count">0</strong>
+          <span id="keep-pct">0%</span>
+        </div>
+      </div>
+
+      <div class="progress">
+        <div id="bar-sack" class="progress-bar sack"></div>
+        <div id="bar-keep" class="progress-bar keep"></div>
+      </div>
+    </section>
+
+    <section class="footer-note">
+      <p>Everyone can see total voters and the live percentage. Votes are saved on the server.</p>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
