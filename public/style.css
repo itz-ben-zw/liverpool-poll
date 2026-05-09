@@ -147,6 +147,13 @@ body {
   font-size: 0.95rem;
 }
 
+.footer-note .author {
+  margin-top: 10px;
+  color: #7ecdf3;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+
 @media (max-width: 640px) {
   .vote-buttons {
     grid-template-columns: 1fr;
