@@ -1,11 +1,15 @@
 const express = require("express");
 const { DatabaseSync } = require("node:sqlite");
 const crypto = require("node:crypto");
+const { OAuth2Client } = require("google-auth-library");
 const path = require("node:path");
 
 const app = express();
 const db = new DatabaseSync(process.env.DB_PATH || "quickcart.db");
 const PORT = Number(process.env.PORT || 3000);
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || (process.env.NODE_ENV === "production" ? "https://quickcart-ecommerce-gu1i.onrender.com/auth/google/callback" : "http://localhost:3000/auth/google/callback");
 const SESSION_DAYS = 7;
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
@@ -18,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT NOT NULL,
   email TEXT NOT NULL COLLATE NOCASE UNIQUE,
   password_hash TEXT NOT NULL,
+  google_sub TEXT,
   role TEXT NOT NULL CHECK(role IN ('buyer','seller','admin')),
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -67,6 +72,8 @@ function addColumnIfMissing(table, column, definition) {
   const columns = db.prepare("PRAGMA table_info(" + table + ")").all();
   if (!columns.some(c => c.name === column)) db.exec("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
 }
+addColumnIfMissing("users", "google_sub", "TEXT");
+db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub_unique ON users(google_sub) WHERE google_sub IS NOT NULL;");
 addColumnIfMissing("products", "seller_id", "INTEGER REFERENCES users(id)");
 addColumnIfMissing("products", "stock", "INTEGER NOT NULL DEFAULT 20");
 addColumnIfMissing("products", "category", "TEXT NOT NULL DEFAULT 'Everyday'");
@@ -154,6 +161,68 @@ app.post("/api/auth/login",(req,res)=>{
   res.setHeader("Set-Cookie","qc_session="+encodeURIComponent(token)+"; "+cookieOptions(SESSION_DAYS*86400));
   res.json({user:cleanUser(user),message:"Signed in successfully."});
 });
+function googleOAuthClient() {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return null;
+  return new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
+}
+function safeEqual(a,b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const left=Buffer.from(a),right=Buffer.from(b);
+  return left.length===right.length && crypto.timingSafeEqual(left,right);
+}
+function clearGoogleCookies(res) {
+  const secure=process.env.NODE_ENV==="production" ? "; Secure" : "";
+  ["qc_google_state","qc_google_nonce","qc_google_role"].forEach(name=>res.append("Set-Cookie",name+"=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"+secure));
+}
+app.get("/auth/google",(req,res)=>{
+  const client=googleOAuthClient();
+  if(!client)return res.redirect("/?google=setup#account");
+  const role=req.query.role==="seller" ? "seller" : "buyer";
+  const state=crypto.randomBytes(32).toString("base64url");
+  const nonce=crypto.randomBytes(32).toString("base64url");
+  const secure=process.env.NODE_ENV==="production" ? "; Secure" : "";
+  res.append("Set-Cookie","qc_google_state="+state+"; Path=/; HttpOnly; SameSite=Lax; Max-Age=600"+secure);
+  res.append("Set-Cookie","qc_google_nonce="+nonce+"; Path=/; HttpOnly; SameSite=Lax; Max-Age=600"+secure);
+  res.append("Set-Cookie","qc_google_role="+role+"; Path=/; HttpOnly; SameSite=Lax; Max-Age=600"+secure);
+  const url=client.generateAuthUrl({access_type:"online",prompt:"select_account",scope:["openid","email","profile"],state,nonce});
+  res.redirect(url);
+});
+app.get("/auth/google/callback",async(req,res)=>{
+  const client=googleOAuthClient();
+  const stateCookie=readCookie(req,"qc_google_state");
+  const nonceCookie=readCookie(req,"qc_google_nonce");
+  const roleCookie=readCookie(req,"qc_google_role");
+  const stateOk=safeEqual(String(req.query.state||""),stateCookie);
+  clearGoogleCookies(res);
+  if(!client || !stateOk || !nonceCookie || typeof req.query.code!=="string" || req.query.error) return res.redirect("/?google=failed#account");
+  try{
+    const {tokens}=await client.getToken(req.query.code);
+    if(!tokens.id_token)throw Error("Google did not return an ID token.");
+    const ticket=await client.verifyIdToken({idToken:tokens.id_token,audience:GOOGLE_CLIENT_ID});
+    const profile=ticket.getPayload();
+    if(!profile || !profile.sub || !profile.email || profile.email_verified!==true || !safeEqual(String(profile.nonce||""),nonceCookie)) throw Error("Google account verification failed.");
+    let user=db.prepare("SELECT id,name,email,role,created_at,google_sub FROM users WHERE google_sub=?").get(profile.sub);
+    if(!user){
+      user=db.prepare("SELECT id,name,email,role,created_at,google_sub FROM users WHERE email=? COLLATE NOCASE").get(profile.email);
+      if(user){
+        if(user.google_sub && user.google_sub!==profile.sub)throw Error("That email is already linked to another Google account.");
+        db.prepare("UPDATE users SET google_sub=? WHERE id=?").run(profile.sub,user.id);
+        user=db.prepare("SELECT id,name,email,role,created_at,google_sub FROM users WHERE id=?").get(user.id);
+      }else{
+        const result=db.prepare("INSERT INTO users(name,email,password_hash,google_sub,role) VALUES(?,?,?,?,?)").run(String(profile.name||profile.email).slice(0,100),profile.email.toLowerCase(),"google:"+crypto.randomBytes(32).toString("hex"),profile.sub,roleCookie==="seller"?"seller":"buyer");
+        user=db.prepare("SELECT id,name,email,role,created_at,google_sub FROM users WHERE id=?").get(result.lastInsertRowid);
+      }
+    }
+    const token=crypto.randomBytes(32).toString("base64url");
+    db.prepare("INSERT INTO sessions(user_id,token_hash,expires_at) VALUES(?,?,?)").run(user.id,hashToken(token),Date.now()+SESSION_DAYS*86400000);
+    res.append("Set-Cookie","qc_session="+encodeURIComponent(token)+"; "+cookieOptions(SESSION_DAYS*86400));
+    res.redirect("/?google=success");
+  }catch(error){
+    console.error("Google sign-in failed:",error.message);
+    res.redirect("/?google=failed#account");
+  }
+});
+
 app.post("/api/auth/logout",(req,res)=>{
   const token=readCookie(req,"qc_session"); if(token)db.prepare("DELETE FROM sessions WHERE token_hash=?").run(hashToken(token));
   res.setHeader("Set-Cookie","qc_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");res.json({message:"Signed out."});
