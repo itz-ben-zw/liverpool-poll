@@ -70,14 +70,51 @@
 @media(prefers-reduced-motion:reduce){.reveal,.hero-copy>*,.hero-visual img{opacity:1;transform:none;animation:none;transition:none}}
 
 .account-backdrop{position:fixed;inset:0;background:#0e201a88;z-index:20;display:none;align-items:center;justify-content:center;padding:16px}.account-backdrop.open{display:flex}.account-modal{width:min(680px,100%);max-height:90dvh;overflow:auto;background:var(--surface);padding:clamp(22px,4vw,38px);box-shadow:0 24px 80px #142d2533}.account-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:20px}.account-head h2{font:32px var(--serif);font-weight:400;margin:0}.auth-tabs{display:flex;gap:8px;margin-bottom:20px}.auth-tab{border:1px solid var(--line);background:transparent;padding:10px 16px;font-size:12px;color:var(--muted)}.auth-tab.active{background:var(--green);border-color:var(--green);color:white}.auth-form,.seller-form{display:grid;gap:13px}.auth-form label,.seller-form label{display:grid;gap:7px;font-size:11px;color:var(--muted)}.auth-form input,.auth-form select,.seller-form input,.seller-form textarea,.seller-form select{width:100%;border:1px solid var(--line);padding:12px;background:white;font:13px var(--sans);color:var(--ink)}.auth-form [hidden]{display:none}.account-user{display:flex;justify-content:space-between;gap:14px;background:#edf0e9;padding:15px;margin-bottom:20px}.account-user strong{font:21px var(--serif);font-weight:400}.account-actions,.inventory-actions{display:flex;gap:6px;flex-wrap:wrap}.account-actions button,.inventory-actions button{border:1px solid var(--line);background:transparent;padding:8px 11px;font-size:11px;color:var(--green)}.seller-dashboard h3,.buyer-orders h3{font:25px var(--serif);font-weight:400;margin:22px 0 12px}.seller-form{grid-template-columns:1fr 1fr}.seller-form label.full,.seller-form button{grid-column:1/-1}.seller-form textarea{min-height:75px}.inventory-list{display:grid;gap:9px;margin-top:12px}.inventory-item{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px;border:1px solid var(--line)}.inventory-item strong{display:block;font:17px var(--serif);font-weight:400}.inventory-item small{color:var(--muted);font-size:11px}.account-empty{padding:14px;background:#f2f3ed;color:var(--muted);font-size:12px}@media(max-width:560px){.seller-form{grid-template-columns:1fr}.seller-form label.full,.seller-form button{grid-column:auto}.inventory-item{grid-template-columns:1fr}}
+
+/* Marketplace navigation and the Benjamin Franklin brand feature */
+[hidden]{display:none!important}
+.heritage-feature{width:min(1320px,100% - 48px);margin:76px auto 30px;display:grid;grid-template-columns:minmax(0,1.08fr) minmax(300px,.92fr);align-items:center;gap:clamp(34px,6vw,86px);padding:clamp(22px,4vw,48px);background:#e7eae1;border:1px solid #dce2d8}
+.heritage-art{position:relative;min-width:0;width:100%;aspect-ratio:1.22/1;display:grid;place-items:center;overflow:hidden;background:#d7dfd8}
+.heritage-art img{display:block;width:100%;height:100%;object-fit:contain;object-position:center center}
+.heritage-stamp{position:absolute;left:16px;bottom:16px;padding:10px 13px;background:#f4f3edeb;color:var(--green);font-size:9px;letter-spacing:.14em}
+.heritage-copy{max-width:490px;padding:24px 0}
+.heritage-copy .eyebrow{margin-bottom:18px}
+.heritage-copy h2{font:clamp(36px,4.6vw,60px)/1.02 var(--serif);font-weight:400;letter-spacing:-.05em;margin:0 0 20px}
+.heritage-copy h2 em{color:var(--green2);font-weight:400}
+.heritage-copy>p:last-child{max-width:420px;color:var(--muted);font-size:14px;line-height:1.85;margin:0}
+.marketplace-view{min-height:70vh;background:var(--paper);padding:0 clamp(18px,6vw,84px) 90px}
+.marketplace-topline{display:flex;justify-content:space-between;align-items:center;padding:22px 0;border-bottom:1px solid var(--line);font-size:9px;letter-spacing:.15em;color:var(--muted)}
+.back-home{border:0;background:none;color:var(--green);font-size:12px;padding:8px 0}
+.marketplace-intro{padding:64px 0 36px}
+.marketplace-intro .eyebrow{margin-bottom:16px}
+.marketplace-intro h1{font:clamp(46px,7vw,82px)/.96 var(--serif);font-weight:400;letter-spacing:-.055em;margin:0}
+.marketplace-intro h1 em{color:var(--green2);font-weight:400}
+.marketplace-intro>p:last-child{font-size:14px;color:var(--muted);line-height:1.7;margin:18px 0 0}
+.market-search-wrap{position:sticky;top:0;z-index:3;background:var(--paper);padding:12px 0 18px;border-bottom:1px solid var(--line)}
+.search-field{height:58px;display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--surface);border:1px solid #cdd5ca}
+.search-field>span{font:28px var(--serif);color:var(--green)}
+.search-field input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:14px var(--sans)}
+.search-field input::placeholder{color:#89938b}
+.search-field kbd{border:1px solid var(--line);padding:3px 7px;color:var(--muted);font-size:10px}
+.filter-row{display:flex;gap:8px;overflow-x:auto;padding:14px 0 0;scrollbar-width:thin}
+.filter-chip{white-space:nowrap;border:1px solid var(--line);background:transparent;color:var(--muted);padding:9px 14px;font-size:11px}
+.filter-chip.active,.filter-chip:hover{background:var(--green);border-color:var(--green);color:white}
+.market-results-head{display:flex;justify-content:space-between;align-items:end;gap:15px;padding:30px 0 18px}
+.market-results-head h2{font:28px var(--serif);font-weight:400;margin:0}
+.market-results-head span{font-size:11px;color:var(--muted)}
+.marketplace-view .products{grid-template-columns:repeat(3,minmax(0,1fr));gap:28px 22px}
+.market-empty{padding:40px 16px;text-align:center;color:var(--muted);font:22px var(--serif)}
+@media(max-width:800px){.heritage-feature{grid-template-columns:1fr;width:calc(100% - 32px);gap:18px;margin:52px auto 20px}.heritage-art{aspect-ratio:1.35/1}.heritage-copy{padding:10px 4px 16px}.marketplace-view .products{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.heritage-feature{padding:14px}.heritage-art{aspect-ratio:1/1}.heritage-copy h2{font-size:40px}.marketplace-intro{padding:48px 0 26px}.marketplace-view .products{gap:22px 12px}.market-results-head h2{font-size:24px}.market-results-head{align-items:center}}
+
 </style>
 </head>
 <body>
 <div class="announcement">A considered collection for everyday living</div>
-<header class="nav"><a class="brand" href="#">quick<span>cart</span></a><nav class="navlinks"><a href="#shop">Shop</a><a href="#story">Our approach</a><a href="#footer">Contact</a></nav><div class="navright"><button class="cart-toggle" id="openCart">Your bag <span class="cart-count" id="count">0</span></button><button class="cart-toggle" id="openAccount" type="button">Account ↗</button></div></header>
+<header class="nav"><a class="brand" href="#">quick<span>cart</span></a><nav class="navlinks"><a href="#shop" data-open-shop="true">Shop</a><a href="#story">Our approach</a><a href="#footer">Contact</a></nav><div class="navright"><button class="cart-toggle" id="openCart">Your bag <span class="cart-count" id="count">0</span></button><button class="cart-toggle" id="openAccount" type="button">Account ↗</button></div></header>
 <main>
 <section class="hero">
-<div class="hero-copy"><p class="eyebrow">The everyday edit · No. 01</p><h1>Good things.<br><em>Chosen well.</em></h1><p>Useful objects for work, home and everywhere in between. A small collection of everyday essentials, selected with care.</p><a class="primary" href="#shop">Explore the collection <span>↗</span></a><div class="hero-note">Thoughtful finds, straightforward shopping</div></div>
+<div class="hero-copy"><p class="eyebrow">The everyday edit · No. 01</p><h1>Good things.<br><em>Chosen well.</em></h1><p>Useful objects for work, home and everywhere in between. A small collection of everyday essentials, selected with care.</p><a class="primary" href="#shop" data-open-shop="true">Explore the collection <span>↗</span></a><div class="hero-note">Thoughtful finds, straightforward shopping</div></div>
 <div class="hero-visual"><img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1400&q=85" alt="Over-ear headphones, carefully photographed"><div class="visual-caption">The everyday edit · Selected essentials</div></div>
 </section>
 <section class="value-strip" aria-label="Shopping benefits">
@@ -88,9 +125,9 @@
 <section class="category-section" aria-labelledby="category-title">
 <div class="category-heading"><h2 id="category-title">Find your everyday.</h2><p>A focused edit of useful pieces for the spaces and moments that make up your day.</p></div>
 <div class="category-grid">
-<a class="category-card" href="#shop"><img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=900&q=85" alt="A considered workspace"><span class="category-label"><small>For getting things done</small><strong>Work & tech ↗</strong></span></a>
-<a class="category-card" href="#shop"><img src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=900&q=85" alt="A calm, welcoming home"><span class="category-label"><small>For the spaces you live in</small><strong>Home & living ↗</strong></span></a>
-<a class="category-card" href="#shop"><img src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=900&q=85" alt="A simple everyday accessory"><span class="category-label"><small>Little things, well chosen</small><strong>Everyday carry ↗</strong></span></a>
+<a class="category-card" href="#shop" data-open-shop="true"><img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=900&q=85" alt="A considered workspace"><span class="category-label"><small>For getting things done</small><strong>Work & tech ↗</strong></span></a>
+<a class="category-card" href="#shop" data-open-shop="true"><img src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=900&q=85" alt="A calm, welcoming home"><span class="category-label"><small>For the spaces you live in</small><strong>Home & living ↗</strong></span></a>
+<a class="category-card" href="#shop" data-open-shop="true"><img src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=900&q=85" alt="A simple everyday accessory"><span class="category-label"><small>Little things, well chosen</small><strong>Everyday carry ↗</strong></span></a>
 </div>
 </section>
 <section class="heritage-feature" aria-label="QuickCart brand story">
@@ -118,14 +155,14 @@
       <div class="role-symbol" aria-hidden="true">↗</div>
       <h3>Find what fits<br>your everyday.</h3>
       <p>Explore products, compare details, save your favourites and keep your orders in one place.</p>
-      <a class="role-link" href="#shop">Explore the marketplace <span>↗</span></a>
+      <a class="role-link" href="#shop" data-open-shop="true">Explore the marketplace <span>↗</span></a>
     </article>
     <article class="role-card seller-card">
       <div class="role-index">02 / SELLER</div>
       <div class="role-symbol" aria-hidden="true">＋</div>
       <h3>Make room<br>for your business.</h3>
       <p>Build a storefront, list products, manage stock and follow incoming orders from a seller workspace.</p>
-      <a class="role-link" href="#seller-preview">Discover the seller experience <span>↗</span></a>
+      <a class="role-link" href="#account" data-seller-entry="true">Open a seller account <span>↗</span></a>
     </article>
   </div>
   <div class="seller-preview" id="seller-preview">
@@ -138,118 +175,69 @@
     </div>
   </div>
 </section>
-<section class="shop" id="shop"><div class="shop-head"><h3>Shop the collection</h3><span>Six considered essentials</span></div><div id="products" class="products">Loading collection…</div></section>
+
 <section class="manifesto"><p>“The best everyday things are the ones that quietly do their job, and do it well.”</p><small>QuickCart · The everyday edit</small></section>
 </main>
+
+<section class="marketplace-view" id="marketplaceView" hidden>
+  <div class="marketplace-topline"><button class="back-home" id="backHome">← Back to QuickCart</button><span>QUICKCART MARKETPLACE</span></div>
+  <div class="marketplace-intro"><p class="eyebrow">THE EVERYDAY EDIT</p><h1>Find something<br><em>worth keeping.</em></h1><p>Search the marketplace and explore products from independent sellers.</p></div>
+  <div class="market-search-wrap"><label class="search-field"><span aria-hidden="true">⌕</span><input id="productSearch" type="search" placeholder="Search products, categories and sellers…" autocomplete="off"><kbd>/</kbd></label><div class="filter-row" id="categoryFilters"><button class="filter-chip active" data-category="all">All products</button><button class="filter-chip" data-category="Work & tech">Work & tech</button><button class="filter-chip" data-category="Home & living">Home & living</button><button class="filter-chip" data-category="Everyday carry">Everyday carry</button><button class="filter-chip" data-category="Everyday">Everyday</button></div></div>
+  <div class="market-results-head"><h2>Explore the collection</h2><span id="resultCount">Loading products…</span></div>
+  <div id="products" class="products"><div class="account-empty">Loading marketplace…</div></div>
+  <div class="market-empty" id="marketEmpty" hidden>No products match that search. Try another name or category.</div>
+</section>
 <footer class="footer" id="footer"><span>© 2026 QuickCart. All rights reserved.</span><span><a href="#footer">Privacy</a> &nbsp;·&nbsp; <a href="#footer">Terms</a> &nbsp;·&nbsp; Built for everyday shopping</span></footer>
 <div class="backdrop" id="backdrop"></div><aside class="cart-panel" id="cartPanel" aria-label="Shopping cart"><div class="cart-top"><h2>Your bag</h2><button class="close" id="closeCart" aria-label="Close cart">×</button></div><div class="cart-items" id="items">Your bag is empty.</div><div class="cart-total"><div class="total-line"><span>Subtotal</span><strong>$<span id="total">0.00</span></strong></div><form class="checkout" id="checkout"><input name="name" placeholder="Full name" required><input name="email" type="email" placeholder="Email address" required><input name="address" placeholder="Delivery address" required><button class="primary">Place order <span>→</span></button></form><p class="notice" id="message">Demo checkout. No online payment is collected.</p></div></aside>
 <div class="account-backdrop" id="accountBackdrop"><section class="account-modal" role="dialog" aria-modal="true"><div class="account-head"><div><p class="eyebrow">YOUR QUICKCART</p><h2>Your account</h2></div><button class="close" id="closeAccount">×</button></div><div id="accountBody"><div class="auth-tabs"><button type="button" class="auth-tab active" data-auth-mode="login">Sign in</button><button type="button" class="auth-tab" data-auth-mode="register">Create account</button></div><form id="authForm" class="auth-form"><label id="authNameWrap" hidden>Full name<input name="name" autocomplete="name"></label><label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" minlength="8" required></label><label id="authRoleWrap" hidden>Account type<select name="role"><option value="buyer">I want to shop</option><option value="seller">I want to sell</option></select></label><button class="primary" type="submit" id="authSubmit">Sign in →</button><p class="notice" id="authMessage">Sign in to manage your account.</p></form></div></section></div>
 <script>
-let products=[],cart=[],currentUser=null,sellerProducts=[],authMode="login";const $=s=>document.querySelector(s),money=n=>Number(n).toFixed(2);
-async function load(){try{products=await fetch('/api/products').then(r=>r.json());$('#products').innerHTML=products.map(p=>'<article class="product"><div class="product-image"><img src="'+esc(p.image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div class="product-meta"><div><h4>'+esc(p.name)+'</h4><p>'+esc(p.description)+'</p><small>'+p.stock+' available</small><br><button class="add" data-add="'+p.id+'">Add to bag +</button></div><span class="price">.join('')}catch(e){$('#products').textContent='The collection is temporarily unavailable.'}}
-function render(){const count=cart.reduce((s,i)=>s+i.quantity,0);$('#count').textContent=count;$('#items').innerHTML=cart.length?cart.map(i=>{const p=products.find(p=>p.id===i.id);return '<div class="cart-row"><span>'+p.name+' × '+i.quantity+'</span><span>$'+money(p.price*i.quantity)+' <button data-remove="'+i.id+'">Remove</button></span></div>'}).join(''):'Your bag is empty.';$('#total').textContent=money(cart.reduce((s,i)=>s+products.find(p=>p.id===i.id).price*i.quantity,0))}
-function panel(open){$('#cartPanel').classList.toggle('open',open);$('#backdrop').classList.toggle('show',open)}
-$('#products').addEventListener('click',e=>{const b=e.target.closest('[data-add]');if(!b)return;const id=Number(b.dataset.add),item=cart.find(x=>x.id===id);item?item.quantity++:cart.push({id,quantity:1});render();$('#message').textContent='Added to your bag.'});
-$('#items').addEventListener('click',e=>{const b=e.target.closest('[data-remove]');if(!b)return;cart=cart.filter(x=>x.id!==Number(b.dataset.remove));render()});
-$('#openCart').onclick=()=>panel(true);$('#closeCart').onclick=()=>panel(false);$('#backdrop').onclick=()=>panel(false);
-$('#checkout').addEventListener('submit',async e=>{e.preventDefault();if(!cart.length){$('#message').textContent='Add an item before checking out.';return}const customer=Object.fromEntries(new FormData(e.target).entries());const r=await fetch('/api/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer,items:cart})});const d=await r.json();$('#message').textContent=r.ok?'Order #'+d.orderId+' placed. Total: $'+money(d.total):d.error;if(r.ok){cart=[];render();e.target.reset()}});
 
-// NUST-inspired motion system: restrained entrance, viewport reveals and reduced-motion support.
-(() => {
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const targets = document.querySelectorAll('.value-item,.category-heading,.category-card,.heritage-feature,.intro,.roles-heading,.role-card,.seller-preview,.shop-head,.product,.manifesto');
-  if (reduce || !('IntersectionObserver' in window)) {
-    targets.forEach(el => el.classList.add('is-visible'));
-    return;
-  }
-  targets.forEach((el,index) => {
-    el.classList.add('reveal');
-    if (el.classList.contains('category-card') || el.classList.contains('role-card')) {
-      el.style.transitionDelay = (index % 3) * 85 + 'ms';
-    }
-  });
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) return;
-      entry.target.classList.add('is-visible');
-      observer.unobserve(entry.target);
-    });
-  }, { threshold: 0.14, rootMargin: '0px 0px -36px 0px' });
-  targets.forEach(el => observer.observe(el));
-})();
-
-const api=async(url,options={})=>{const r=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({error:"Unexpected server response"}));if(!r.ok)throw Error(d.error||"Request failed");return d};
+let products=[],cart=[],currentUser=null,sellerProducts=[],authMode="login",activeCategory="all";
+const $=s=>document.querySelector(s),money=n=>Number(n||0).toFixed(2);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const accountOpen=open=>{document.querySelector("#accountBackdrop").classList.toggle("open",open);if(open)refreshAccount()};
-document.querySelector("#openAccount").onclick=()=>accountOpen(true);
-document.querySelector("#closeAccount").onclick=()=>accountOpen(false);
-document.querySelector("#accountBackdrop").onclick=e=>{if(e.target.id==="accountBackdrop")accountOpen(false)};
-function setAuthMode(mode){authMode=mode;document.querySelectorAll("[data-auth-mode]").forEach(b=>b.classList.toggle("active",b.dataset.authMode===mode));const form=document.querySelector("#authForm");if(!form)return;form.elements.name.parentElement.hidden=mode!=="register";form.elements.role.parentElement.hidden=mode!=="register";form.elements.name.required=mode==="register";document.querySelector("#authSubmit").textContent=mode==="register"?"Create account →":"Sign in →"}
-async function refreshAccount(){try{currentUser=(await api("/api/auth/me")).user;renderAccount()}catch{currentUser=null;document.querySelector("#accountBody").innerHTML='<div class="auth-tabs"><button class="auth-tab active" type="button" data-auth-mode="login">Sign in</button><button class="auth-tab" type="button" data-auth-mode="register">Create account</button></div><form id="authForm" class="auth-form"><label>Full name<input name="name" autocomplete="name"></label><label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" minlength="8" required></label><label>Account type<select name="role"><option value="buyer">I want to shop</option><option value="seller">I want to sell</option></select></label><button class="primary" id="authSubmit">Sign in →</button><p class="notice" id="authMessage">Sign in or create an account.</p></form>';document.querySelectorAll("[data-auth-mode]").forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));setAuthMode("login");document.querySelector("#authForm").onsubmit=submitAuth}}
-async function submitAuth(e){e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget));const msg=document.querySelector("#authMessage");try{const r=await api("/api/auth/"+(authMode==="register"?"register":"login"),{method:"POST",body:JSON.stringify(data)});currentUser=r.user;renderAccount();document.querySelector("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0]}catch(err){msg.textContent=err.message}}
-function renderAccount(){const seller=currentUser.role==="seller";document.querySelector("#accountBody").innerHTML='<div class="account-user"><div><small>'+esc(currentUser.role.toUpperCase())+'</small><br><strong>'+esc(currentUser.name)+'</strong><br><small>'+esc(currentUser.email)+'</small></div><div class="account-actions"><button id="logoutBtn">Sign out</button></div></div>'+(seller?'<div class="seller-dashboard"><h3>Your shop · Add a product</h3><form id="sellerForm" class="seller-form"><label>Product name<input name="name" required maxlength="120"></label><label>Price (USD)<input name="price" type="number" min="0" step=".01" required></label><label class="full">Description<textarea name="description" required maxlength="2000"></textarea></label><label>Image URL<input name="image" type="url" required></label><label>Category<select name="category"><option>Everyday</option><option>Work & tech</option><option>Home & living</option><option>Everyday carry</option></select></label><label>Starting quantity<input name="stock" type="number" min="0" value="1" required></label><button class="primary">List product +</button></form><h3>Your inventory</h3><div id="inventoryList" class="inventory-list">Loading…</div><h3>Incoming orders</h3><div id="sellerOrders" class="account-empty">Loading…</div></div>':'<div class="buyer-orders"><h3>Your orders</h3><div id="buyerOrderList" class="account-empty">Loading…</div></div>');document.querySelector("#logoutBtn").onclick=async()=>{await api("/api/auth/logout",{method:"POST"});currentUser=null;document.querySelector("#openAccount").textContent="Account ↗";refreshAccount()};if(seller){document.querySelector("#sellerForm").onsubmit=createProduct;loadSeller()}else loadBuyerOrders()}
-async function createProduct(e){e.preventDefault();const d=Object.fromEntries(new FormData(e.currentTarget));d.price=Number(d.price);d.stock=Number(d.stock);try{await api("/api/seller/products",{method:"POST",body:JSON.stringify(d)});e.currentTarget.reset();loadSeller();load()}catch(err){alert(err.message)}}
-async function loadSeller(){try{sellerProducts=await api("/api/seller/products");document.querySelector("#inventoryList").innerHTML=sellerProducts.length?sellerProducts.map(p=>'<div class="inventory-item"><div><strong>'+esc(p.name)+'</strong><small>
-</body></html>+money(p.price)+' · Stock: '+p.stock+' · '+(p.active?"Listed":"Removed")+'</small></div><div class="inventory-actions"><button data-stock="-1" data-id="'+p.id+'">−</button><button data-stock="1" data-id="'+p.id+'">+ qty</button><button data-edit="'+p.id+'">Edit</button><button data-delete="'+p.id+'">Remove</button></div></div>').join(""):'<div class="account-empty">No products yet. Add your first listing above.</div>';document.querySelector("#inventoryList").onclick=inventoryAction;const orders=await api("/api/seller/orders");document.querySelector("#sellerOrders").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+' · '+esc(o.product_name)+'</strong><small>'+esc(o.customer_name)+' · Qty '+o.quantity+'</small></div><b>
-</body></html>+money(o.unit_price*o.quantity)+'</b></div>').join(""):'No orders for your products yet.'}catch(e){document.querySelector("#inventoryList").textContent=e.message}}
-async function inventoryAction(e){const b=e.target.closest("button");if(!b)return;const id=Number(b.dataset.id||b.dataset.edit||b.dataset.delete),p=sellerProducts.find(x=>x.id===id);if(!p)return;try{if(b.dataset.stock){await api("/api/seller/products/"+id,{method:"PATCH",body:JSON.stringify({stock:Math.max(0,p.stock+Number(b.dataset.stock))})})}else if(b.dataset.delete){if(!confirm("Remove "+p.name+" from your shop?"))return;await api("/api/seller/products/"+id,{method:"DELETE"})}else{const name=prompt("Product name",p.name);if(name===null)return;const price=prompt("Price (USD)",p.price);if(price===null)return;const stock=prompt("Available quantity",p.stock);if(stock===null)return;await api("/api/seller/products/"+id,{method:"PATCH",body:JSON.stringify({name,price:Number(price),stock:Number(stock)})})}await loadSeller();await load()}catch(err){alert(err.message)}}
-async function loadBuyerOrders(){try{const orders=await api("/api/orders");document.querySelector("#buyerOrderList").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+'</strong><small>'+esc(o.status)+' · '+esc(o.created_at)+'</small></div><b>
-</body></html>+money(o.total)+'</b></div>').join(""):'No orders yet.'}catch(e){document.querySelector("#buyerOrderList").textContent=e.message}}
-(async()=>{try{currentUser=(await api("/api/auth/me")).user;document.querySelector("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0]+" ↗"}catch{}})();
+async function api(url,options={}){const r=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({error:"Unexpected server response."}));if(!r.ok)throw Error(d.error||"Request failed.");return d}
+function showMarketplace(category="all"){activeCategory=category;document.querySelector("main").hidden=true;$("#marketplaceView").hidden=false;window.scrollTo({top:0,behavior:"smooth"});if(!products.length)loadProducts();else renderProducts();if(category!=="all")setCategory(category)}
+function showHome(){document.querySelector("main").hidden=false;$("#marketplaceView").hidden=true;window.scrollTo({top:0,behavior:"smooth"})}
+document.addEventListener("click",e=>{
+ const shopLink=e.target.closest("[data-open-shop]");
+ if(shopLink){e.preventDefault();const card=shopLink.closest(".category-card");let category="all";if(card){const label=card.querySelector(".category-label strong")?.textContent||"";category=label.includes("Work")?"Work & tech":label.includes("Home")?"Home & living":label.includes("Everyday")?"Everyday carry":"all"}showMarketplace(category);return}
+ const sellerLink=e.target.closest("[data-seller-entry]");
+ if(sellerLink){e.preventDefault();accountOpen(true);setTimeout(()=>setAuthMode("register","seller"),0)}
+});
+$("#backHome").onclick=showHome;
+$("#productSearch").addEventListener("input",renderProducts);
+$("#categoryFilters").addEventListener("click",e=>{const b=e.target.closest("[data-category]");if(b)setCategory(b.dataset.category)});
+function setCategory(category){activeCategory=category;document.querySelectorAll("[data-category]").forEach(b=>b.classList.toggle("active",b.dataset.category===category));renderProducts()}
+async function loadProducts(){try{products=await api("/api/products");renderProducts()}catch(e){$("#products").innerHTML='<div class="account-empty">'+esc(e.message)+'</div>'}}
+function renderProducts(){
+ const q=$("#productSearch").value.trim().toLowerCase();
+ const filtered=products.filter(p=>(activeCategory==="all"||p.category===activeCategory)&&(!q||[p.name,p.description,p.category,p.seller_name].join(" ").toLowerCase().includes(q)));
+ $("#resultCount").textContent=filtered.length+" "+(filtered.length===1?"product":"products");
+ $("#marketEmpty").hidden=filtered.length!==0;
+ $("#products").innerHTML=filtered.map(p=>'<article class="product"><div class="product-image"><img src="'+esc(p.image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div class="product-meta"><div><h4>'+esc(p.name)+'</h4><p>'+esc(p.description)+'</p><small>'+Number(p.stock)+' available</small><br><button class="add" data-add="'+p.id+'">Add to bag +</button></div><span class="price">$'+money(p.price)+'</span></div></article>').join("");
+}
+function renderCart(){const count=cart.reduce((s,i)=>s+i.quantity,0);$("#count").textContent=count;$("#items").innerHTML=cart.length?cart.map(i=>{const p=products.find(p=>p.id===i.id);if(!p)return "";return '<div class="cart-row"><span>'+esc(p.name)+' × '+i.quantity+'</span><span>$'+money(p.price*i.quantity)+' <button data-remove="'+i.id+'">Remove</button></span></div>'}).join(""):"Your bag is empty.";$("#total").textContent=money(cart.reduce((s,i)=>{const p=products.find(p=>p.id===i.id);return s+(p?p.price*i.quantity:0)},0))}
+function cartPanel(open){$("#cartPanel").classList.toggle("open",open);$("#backdrop").classList.toggle("show",open)}
+$("#products").addEventListener("click",e=>{const b=e.target.closest("[data-add]");if(!b)return;const id=Number(b.dataset.add),p=products.find(x=>x.id===id),item=cart.find(x=>x.id===id);if(!p)return;if(item){if(item.quantity>=p.stock){$("#message").textContent="You've reached the available stock.";return}item.quantity++}else cart.push({id,quantity:1});renderCart();$("#message").textContent="Added to your bag.";cartPanel(true)});
+$("#items").addEventListener("click",e=>{const b=e.target.closest("[data-remove]");if(!b)return;cart=cart.filter(x=>x.id!==Number(b.dataset.remove));renderCart()});
+$("#openCart").onclick=()=>cartPanel(true);$("#closeCart").onclick=()=>cartPanel(false);$("#backdrop").onclick=()=>cartPanel(false);
+$("#checkout").addEventListener("submit",async e=>{e.preventDefault();if(!cart.length){$("#message").textContent="Add an item before checking out.";return}const customer=Object.fromEntries(new FormData(e.currentTarget).entries());try{const d=await api("/api/checkout",{method:"POST",body:JSON.stringify({customer,items:cart})});$("#message").textContent="Order #"+d.orderId+" placed. Total: $"+money(d.total);cart=[];renderCart();e.currentTarget.reset();await loadProducts()}catch(err){$("#message").textContent=err.message}});
+function accountOpen(open){$("#accountBackdrop").classList.toggle("open",open);if(open)refreshAccount()}
+$("#openAccount").onclick=()=>accountOpen(true);$("#closeAccount").onclick=()=>accountOpen(false);
+$("#accountBackdrop").addEventListener("click",e=>{if(e.target.id==="accountBackdrop")accountOpen(false)});
+function setAuthMode(mode,role){authMode=mode;document.querySelectorAll("[data-auth-mode]").forEach(b=>b.classList.toggle("active",b.dataset.authMode===mode));const form=$("#authForm");if(!form)return;form.elements.name.parentElement.hidden=mode!=="register";form.elements.role.parentElement.hidden=mode!=="register";form.elements.name.required=mode==="register";if(role)form.elements.role.value=role;$("#authSubmit").textContent=mode==="register"?"Create account →":"Sign in →";$("#authMessage").textContent=mode==="register"?"Choose buyer or seller to create your account.":"Sign in to manage your QuickCart account."}
+function authMarkup(){return '<div class="auth-tabs"><button type="button" class="auth-tab active" data-auth-mode="login">Sign in</button><button type="button" class="auth-tab" data-auth-mode="register">Create account</button></div><form id="authForm" class="auth-form"><label>Full name<input name="name" autocomplete="name"></label><label>Email address<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" minlength="8" autocomplete="current-password" required></label><label>Account type<select name="role"><option value="buyer">I want to shop</option><option value="seller">I want to sell</option></select></label><button class="primary" type="submit" id="authSubmit">Sign in →</button><p class="notice" id="authMessage">Sign in or create an account.</p></form>'}
+async function refreshAccount(){try{currentUser=(await api("/api/auth/me")).user;renderAccount()}catch{currentUser=null;$("#accountBody").innerHTML=authMarkup();document.querySelectorAll("[data-auth-mode]").forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));$("#authForm").onsubmit=submitAuth;setAuthMode("login")}}
+async function submitAuth(e){e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget).entries()),msg=$("#authMessage");try{const d=await api("/api/auth/"+(authMode==="register"?"register":"login"),{method:"POST",body:JSON.stringify(data)});currentUser=d.user;$("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0]+" ↗";renderAccount()}catch(err){msg.textContent=err.message}}
+function renderAccount(){const seller=currentUser.role==="seller";$("#accountBody").innerHTML='<div class="account-user"><div><small>'+esc(currentUser.role.toUpperCase())+'</small><br><strong>'+esc(currentUser.name)+'</strong><br><small>'+esc(currentUser.email)+'</small></div><div class="account-actions"><button id="logoutBtn">Sign out</button></div></div>'+(seller?'<div class="seller-dashboard"><h3>Your shop · Add a product</h3><form id="sellerForm" class="seller-form"><label>Product name<input name="name" required maxlength="120"></label><label>Price (USD)<input name="price" type="number" min="0" step=".01" required></label><label class="full">Description<textarea name="description" required maxlength="2000"></textarea></label><label>Image URL<input name="image" type="url" required></label><label>Category<select name="category"><option>Everyday</option><option>Work & tech</option><option>Home & living</option><option>Everyday carry</option></select></label><label>Starting quantity<input name="stock" type="number" min="0" value="1" required></label><button class="primary">List product +</button></form><h3>Your inventory</h3><div id="inventoryList" class="inventory-list">Loading…</div><h3>Incoming orders</h3><div id="sellerOrders" class="account-empty">Loading…</div></div>':'<div class="buyer-orders"><h3>Your orders</h3><div id="buyerOrderList" class="account-empty">Loading…</div></div>');
+ $("#logoutBtn").onclick=async()=>{await api("/api/auth/logout",{method:"POST"});currentUser=null;$("#openAccount").textContent="Account ↗";refreshAccount()};
+ if(seller){$("#sellerForm").onsubmit=createProduct;loadSeller()}else loadBuyerOrders()}
+async function createProduct(e){e.preventDefault();const d=Object.fromEntries(new FormData(e.currentTarget).entries());d.price=Number(d.price);d.stock=Number(d.stock);try{await api("/api/seller/products",{method:"POST",body:JSON.stringify(d)});e.currentTarget.reset();await loadSeller();await loadProducts()}catch(err){alert(err.message)}}
+async function loadSeller(){try{sellerProducts=await api("/api/seller/products");$("#inventoryList").innerHTML=sellerProducts.length?sellerProducts.map(p=>'<div class="inventory-item"><div><strong>'+esc(p.name)+'</strong><small>$'+money(p.price)+' · Stock: '+p.stock+' · '+(p.active?"Listed":"Removed")+'</small></div><div class="inventory-actions"><button data-stock="-1" data-id="'+p.id+'">−</button><button data-stock="1" data-id="'+p.id+'">+ qty</button><button data-edit="'+p.id+'">Edit</button><button data-delete="'+p.id+'">Remove</button></div></div>').join(""):'<div class="account-empty">No products yet. Add your first listing above.</div>';$("#inventoryList").onclick=inventoryAction;const orders=await api("/api/seller/orders");$("#sellerOrders").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+' · '+esc(o.product_name)+'</strong><small>'+esc(o.customer_name)+' · Qty '+o.quantity+'</small></div><b>$'+money(o.unit_price*o.quantity)+'</b></div>').join(""):"No orders for your products yet."}catch(e){$("#inventoryList").textContent=e.message}}
+async function inventoryAction(e){const b=e.target.closest("button");if(!b)return;const id=Number(b.dataset.id||b.dataset.edit||b.dataset.delete),p=sellerProducts.find(x=>x.id===id);if(!p)return;try{if(b.dataset.stock){await api("/api/seller/products/"+id,{method:"PATCH",body:JSON.stringify({stock:Math.max(0,p.stock+Number(b.dataset.stock))})})}else if(b.dataset.delete){if(!confirm("Remove "+p.name+" from your storefront?"))return;await api("/api/seller/products/"+id,{method:"DELETE"})}else{const name=prompt("Product name",p.name);if(name===null)return;const price=prompt("Price (USD)",p.price);if(price===null)return;const stock=prompt("Available quantity",p.stock);if(stock===null)return;await api("/api/seller/products/"+id,{method:"PATCH",body:JSON.stringify({name,price:Number(price),stock:Number(stock)})})}await loadSeller();await loadProducts()}catch(err){alert(err.message)}}
+async function loadBuyerOrders(){try{const orders=await api("/api/orders");$("#buyerOrderList").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+'</strong><small>'+esc(o.status)+' · '+esc(o.created_at)+'</small></div><b>$'+money(o.total)+'</b></div>').join(""):"No orders yet."}catch(e){$("#buyerOrderList").textContent=e.message}}
+(async()=>{try{currentUser=(await api("/api/auth/me")).user;$("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0]+" ↗"}catch{}})();
+document.addEventListener("keydown",e=>{if(e.key==="/"&&!e.ctrlKey&&!e.metaKey&&!["INPUT","TEXTAREA"].includes(document.activeElement.tagName)&&!$("#marketplaceView").hidden){e.preventDefault();$("#productSearch").focus()}if(e.key==="Escape"){accountOpen(false);cartPanel(false)}});
 
-load();
-</script>
-</body></html>+money(p.price)+'</span></div></article>').join('')}catch(e){$('#products').textContent='The collection is temporarily unavailable.'}}
-function render(){const count=cart.reduce((s,i)=>s+i.quantity,0);$('#count').textContent=count;$('#items').innerHTML=cart.length?cart.map(i=>{const p=products.find(p=>p.id===i.id);return '<div class="cart-row"><span>'+p.name+' × '+i.quantity+'</span><span>$'+money(p.price*i.quantity)+' <button data-remove="'+i.id+'">Remove</button></span></div>'}).join(''):'Your bag is empty.';$('#total').textContent=money(cart.reduce((s,i)=>s+products.find(p=>p.id===i.id).price*i.quantity,0))}
-function panel(open){$('#cartPanel').classList.toggle('open',open);$('#backdrop').classList.toggle('show',open)}
-$('#products').addEventListener('click',e=>{const b=e.target.closest('[data-add]');if(!b)return;const id=Number(b.dataset.add),item=cart.find(x=>x.id===id);item?item.quantity++:cart.push({id,quantity:1});render();$('#message').textContent='Added to your bag.'});
-$('#items').addEventListener('click',e=>{const b=e.target.closest('[data-remove]');if(!b)return;cart=cart.filter(x=>x.id!==Number(b.dataset.remove));render()});
-$('#openCart').onclick=()=>panel(true);$('#closeCart').onclick=()=>panel(false);$('#backdrop').onclick=()=>panel(false);
-$('#checkout').addEventListener('submit',async e=>{e.preventDefault();if(!cart.length){$('#message').textContent='Add an item before checking out.';return}const customer=Object.fromEntries(new FormData(e.target).entries());const r=await fetch('/api/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer,items:cart})});const d=await r.json();$('#message').textContent=r.ok?'Order #'+d.orderId+' placed. Total: $'+money(d.total):d.error;if(r.ok){cart=[];render();e.target.reset()}});
-
-// NUST-inspired motion system: restrained entrance, viewport reveals and reduced-motion support.
-(() => {
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const targets = document.querySelectorAll('.value-item,.category-heading,.category-card,.heritage-feature,.intro,.roles-heading,.role-card,.seller-preview,.shop-head,.product,.manifesto');
-  if (reduce || !('IntersectionObserver' in window)) {
-    targets.forEach(el => el.classList.add('is-visible'));
-    return;
-  }
-  targets.forEach((el,index) => {
-    el.classList.add('reveal');
-    if (el.classList.contains('category-card') || el.classList.contains('role-card')) {
-      el.style.transitionDelay = (index % 3) * 85 + 'ms';
-    }
-  });
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) return;
-      entry.target.classList.add('is-visible');
-      observer.unobserve(entry.target);
-    });
-  }, { threshold: 0.14, rootMargin: '0px 0px -36px 0px' });
-  targets.forEach(el => observer.observe(el));
-})();
-
-const api=async(url,options={})=>{const r=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({error:"Unexpected server response"}));if(!r.ok)throw Error(d.error||"Request failed");return d};
-const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const accountOpen=open=>{document.querySelector("#accountBackdrop").classList.toggle("open",open);if(open)refreshAccount()};
-document.querySelector("#openAccount").onclick=()=>accountOpen(true);
-document.querySelector("#closeAccount").onclick=()=>accountOpen(false);
-document.querySelector("#accountBackdrop").onclick=e=>{if(e.target.id==="accountBackdrop")accountOpen(false)};
-function setAuthMode(mode){authMode=mode;document.querySelectorAll("[data-auth-mode]").forEach(b=>b.classList.toggle("active",b.dataset.authMode===mode));const form=document.querySelector("#authForm");if(!form)return;form.elements.name.parentElement.hidden=mode!=="register";form.elements.role.parentElement.hidden=mode!=="register";form.elements.name.required=mode==="register";document.querySelector("#authSubmit").textContent=mode==="register"?"Create account →":"Sign in →"}
-async function refreshAccount(){try{currentUser=(await api("/api/auth/me")).user;renderAccount()}catch{currentUser=null;document.querySelector("#accountBody").innerHTML='<div class="auth-tabs"><button class="auth-tab active" type="button" data-auth-mode="login">Sign in</button><button class="auth-tab" type="button" data-auth-mode="register">Create account</button></div><form id="authForm" class="auth-form"><label>Full name<input name="name" autocomplete="name"></label><label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" minlength="8" required></label><label>Account type<select name="role"><option value="buyer">I want to shop</option><option value="seller">I want to sell</option></select></label><button class="primary" id="authSubmit">Sign in →</button><p class="notice" id="authMessage">Sign in or create an account.</p></form>';document.querySelectorAll("[data-auth-mode]").forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));setAuthMode("login");document.querySelector("#authForm").onsubmit=submitAuth}}
-async function submitAuth(e){e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget));const msg=document.querySelector("#authMessage");try{const r=await api("/api/auth/"+(authMode==="register"?"register":"login"),{method:"POST",body:JSON.stringify(data)});currentUser=r.user;renderAccount();document.querySelector("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0]}catch(err){msg.textContent=err.message}}
-function renderAccount(){const seller=currentUser.role==="seller";document.querySelector("#accountBody").innerHTML='<div class="account-user"><div><small>'+esc(currentUser.role.toUpperCase())+'</small><br><strong>'+esc(currentUser.name)+'</strong><br><small>'+esc(currentUser.email)+'</small></div><div class="account-actions"><button id="logoutBtn">Sign out</button></div></div>'+(seller?'<div class="seller-dashboard"><h3>Your shop · Add a product</h3><form id="sellerForm" class="seller-form"><label>Product name<input name="name" required maxlength="120"></label><label>Price (USD)<input name="price" type="number" min="0" step=".01" required></label><label class="full">Description<textarea name="description" required maxlength="2000"></textarea></label><label>Image URL<input name="image" type="url" required></label><label>Category<select name="category"><option>Everyday</option><option>Work & tech</option><option>Home & living</option><option>Everyday carry</option></select></label><label>Starting quantity<input name="stock" type="number" min="0" value="1" required></label><button class="primary">List product +</button></form><h3>Your inventory</h3><div id="inventoryList" class="inventory-list">Loading…</div><h3>Incoming orders</h3><div id="sellerOrders" class="account-empty">Loading…</div></div>':'<div class="buyer-orders"><h3>Your orders</h3><div id="buyerOrderList" class="account-empty">Loading…</div></div>');document.querySelector("#logoutBtn").onclick=async()=>{await api("/api/auth/logout",{method:"POST"});currentUser=null;document.querySelector("#openAccount").textContent="Account ↗";refreshAccount()};if(seller){document.querySelector("#sellerForm").onsubmit=createProduct;loadSeller()}else loadBuyerOrders()}
-async function createProduct(e){e.preventDefault();const d=Object.fromEntries(new FormData(e.currentTarget));d.price=Number(d.price);d.stock=Number(d.stock);try{await api("/api/seller/products",{method:"POST",body:JSON.stringify(d)});e.currentTarget.reset();loadSeller();load()}catch(err){alert(err.message)}}
-async function loadSeller(){try{sellerProducts=await api("/api/seller/products");document.querySelector("#inventoryList").innerHTML=sellerProducts.length?sellerProducts.map(p=>'<div class="inventory-item"><div><strong>'+esc(p.name)+'</strong><small>
-</body></html>+money(p.price)+' · Stock: '+p.stock+' · '+(p.active?"Listed":"Removed")+'</small></div><div class="inventory-actions"><button data-stock="-1" data-id="'+p.id+'">−</button><button data-stock="1" data-id="'+p.id+'">+ qty</button><button data-edit="'+p.id+'">Edit</button><button data-delete="'+p.id+'">Remove</button></div></div>').join(""):'<div class="account-empty">No products yet. Add your first listing above.</div>';document.querySelector("#inventoryList").onclick=inventoryAction;const orders=await api("/api/seller/orders");document.querySelector("#sellerOrders").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+' · '+esc(o.product_name)+'</strong><small>'+esc(o.customer_name)+' · Qty '+o.quantity+'</small></div><b>
-</body></html>+money(o.unit_price*o.quantity)+'</b></div>').join(""):'No orders for your products yet.'}catch(e){document.querySelector("#inventoryList").textContent=e.message}}
-async function inventoryAction(e){const b=e.target.closest("button");if(!b)return;const id=Number(b.dataset.id||b.dataset.edit||b.dataset.delete),p=sellerProducts.find(x=>x.id===id);if(!p)return;try{if(b.dataset.stock){await api("/api/seller/products/"+id,{method:"PATCH",body:JSON.stringify({stock:Math.max(0,p.stock+Number(b.dataset.stock))})})}else if(b.dataset.delete){if(!confirm("Remove "+p.name+" from your shop?"))return;await api("/api/seller/products/"+id,{method:"DELETE"})}else{const name=prompt("Product name",p.name);if(name===null)return;const price=prompt("Price (USD)",p.price);if(price===null)return;const stock=prompt("Available quantity",p.stock);if(stock===null)return;await api("/api/seller/products/"+id,{method:"PATCH",body:JSON.stringify({name,price:Number(price),stock:Number(stock)})})}await loadSeller();await load()}catch(err){alert(err.message)}}
-async function loadBuyerOrders(){try{const orders=await api("/api/orders");document.querySelector("#buyerOrderList").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+'</strong><small>'+esc(o.status)+' · '+esc(o.created_at)+'</small></div><b>
-</body></html>+money(o.total)+'</b></div>').join(""):'No orders yet.'}catch(e){document.querySelector("#buyerOrderList").textContent=e.message}}
-(async()=>{try{currentUser=(await api("/api/auth/me")).user;document.querySelector("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0]+" ↗"}catch{}})();
-
-load();
 </script>
 </body></html>
