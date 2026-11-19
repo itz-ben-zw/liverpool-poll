@@ -1,20 +1,7 @@
 # QuickCart
 
-A responsive demonstration e-commerce app built with Express, SQLite, HTML, CSS and vanilla JavaScript.
+A responsive demo e-commerce app built with Express, Node.js built-in SQLite, HTML, CSS and vanilla JavaScript.
 
-## Run locally
+Run locally with `npm install && npm start`, then open http://localhost:3000.
 
-```bash
-npm install
-npm start
-```
-
-Open http://localhost:3000.
-
-## Features
-- Product catalogue seeded automatically
-- Add/remove cart items
-- Checkout form and server-side price calculation
-- Orders, customers and order items stored in SQLite
-
-Demo only: no payment gateway or customer authentication is configured. SQLite storage on free ephemeral hosting may reset when the service restarts.
+Features: product catalogue, cart, checkout, server-side price validation, and SQLite-backed customer/order records. Demo only: no payment gateway or customer authentication is configured. Free hosting has ephemeral storage unless a persistent disk or external database is connected.

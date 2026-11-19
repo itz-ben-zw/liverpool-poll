@@ -1,6 +1,6 @@
 {
   "name": "quickcart-ecommerce",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "QuickCart demo ecommerce app",
   "main": "server.js",
@@ -8,10 +8,9 @@
     "start": "node server.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5.0"
   },
   "dependencies": {
-    "express": "4.21.2",
-    "better-sqlite3": "11.8.1"
+    "express": "4.21.2"
   }
 }
