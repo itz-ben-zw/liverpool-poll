@@ -212,7 +212,8 @@ function setCategory(category){activeCategory=category;document.querySelectorAll
 async function loadProducts(){try{products=await api("/api/products");renderProducts()}catch(e){$("#products").innerHTML='<div class="account-empty">'+esc(e.message)+'</div>'}}
 function renderProducts(){
  const q=$("#productSearch").value.trim().toLowerCase();
- let filtered=products.filter(p=>(activeCategory==="all"||p.category===activeCategory)&&(!q||[p.name,p.description,p.category,p.seller_name].join(" ").toLowerCase().includes(q)));\n const sorters={featured:(a,b)=>b.id-a.id,newest:(a,b)=>b.id-a.id,"name-asc":(a,b)=>a.name.localeCompare(b.name),"price-asc":(a,b)=>a.price-b.price,"price-desc":(a,b)=>b.price-a.price,"stock-desc":(a,b)=>b.stock-a.stock};filtered=[...filtered].sort(sorters[activeSort]||sorters.featured);
+ let filtered=products.filter(p=>(activeCategory==="all"||p.category===activeCategory)&&(!q||[p.name,p.description,p.category,p.seller_name].join(" ").toLowerCase().includes(q)));
+ const sorters={featured:(a,b)=>b.id-a.id,newest:(a,b)=>b.id-a.id,"name-asc":(a,b)=>a.name.localeCompare(b.name),"price-asc":(a,b)=>a.price-b.price,"price-desc":(a,b)=>b.price-a.price,"stock-desc":(a,b)=>b.stock-a.stock};filtered=[...filtered].sort(sorters[activeSort]||sorters.featured);
  $("#resultCount").textContent=filtered.length+" "+(filtered.length===1?"product":"products");
  $("#marketEmpty").hidden=filtered.length!==0;
  $("#products").innerHTML=filtered.map(p=>'<article class="product"><div class="product-image"><img src="'+esc(p.image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div class="product-meta"><div><h4>'+esc(p.name)+'</h4><p>'+esc(p.description)+'</p><small>'+Number(p.stock)+' available</small><br><button class="add" data-add="'+p.id+'">Add to bag +</button></div><span class="price">$'+money(p.price)+'</span></div></article>').join("");
