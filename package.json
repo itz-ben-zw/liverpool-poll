@@ -1,20 +1,17 @@
 {
-  "name": "liverpool-poll",
+  "name": "quickcart-ecommerce",
   "version": "1.0.0",
-  "description": "Liverpool fans poll on whether Arne Slot should be sacked",
+  "private": true,
+  "description": "QuickCart demo ecommerce app",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "dependencies": {
-    "cookie-parser": "^1.4.7",
-    "express": "^4.18.2",
-    "pg": "^8.11.2"
-  },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
-  "devDependencies": {
-    "localtunnel": "^2.0.2"
+  "dependencies": {
+    "express": "4.21.2",
+    "better-sqlite3": "11.8.1"
   }
 }

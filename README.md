@@ -1,44 +1,20 @@
-# Liverpool Fan Poll Website
+# QuickCart
 
-A simple website for Liverpool fans to vote whether Arne Slot should be sacked.
+A responsive demonstration e-commerce app built with Express, SQLite, HTML, CSS and vanilla JavaScript.
 
-## Project files
-- `server.js` - Express server that stores votes in `data/votes.json`
-- `public/index.html` - Poll user interface
-- `public/style.css` - Styling for the poll page
-- `public/app.js` - Front-end logic to fetch and submit votes
-- `data/votes.json` - Local vote storage
+## Run locally
 
-## How to run locally
-1. Install Node.js (includes `npm`) from https://nodejs.org/
-2. Open a terminal in this folder.
-3. Run `npm install`
-4. Run `npm start`
-5. Open `http://localhost:3000` in your browser.
+```bash
+npm install
+npm start
+```
 
-## Deploying to a free public host
-This project is ready for free hosting services such as Render.
+Open http://localhost:3000.
 
-### Render deployment
-1. Create a free Render account at https://render.com/
-2. Connect your GitHub repository or push this repository to GitHub.
-3. In Render, create a new Web Service and import this repo.
-4. Use the default `npm install` build command and `npm start` start command.
-5. Select the free plan.
+## Features
+- Product catalogue seeded automatically
+- Add/remove cart items
+- Checkout form and server-side price calculation
+- Orders, customers and order items stored in SQLite
 
-Render will give you a public URL where the app is hosted.
-
-## Persistent votes on Render
-This app now supports using a Postgres database for vote storage.
-
-### To keep votes permanently on Render
-1. In Render, add a free Postgres database service named `liverpool-poll-db`.
-2. In your web service settings, ensure `DATABASE_URL` is set automatically by Render.
-3. Redeploy the web service.
-
-If `DATABASE_URL` is present, the app will store votes in Postgres instead of `data/votes.json`.
-
-## Notes
-- The app uses a cookie plus the request IP to reduce repeated voting.
-- Total vote counts and percentages are visible to everyone.
-- Deploying to a cloud host removes the need to keep your PC running.
+Demo only: no payment gateway or customer authentication is configured. SQLite storage on free ephemeral hosting may reset when the service restarts.
