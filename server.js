@@ -1,9 +1,237 @@
-const express=require("express");const {DatabaseSync}=require("node:sqlite");const path=require("path");const app=express();const db=new DatabaseSync(process.env.DB_PATH||"quickcart.db");const PORT=process.env.PORT||3000;app.use(express.json());db.exec(`
-CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY,name TEXT NOT NULL,description TEXT NOT NULL,price REAL NOT NULL,image TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,address TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY,customer_id INTEGER NOT NULL,total REAL NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE IF NOT EXISTS order_items(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL,product_id INTEGER NOT NULL,quantity INTEGER NOT NULL,unit_price REAL NOT NULL);
-`);const seed=[["Wireless Headphones","Comfortable over-ear headphones with clear sound.",39.99,"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=700"],["Classic Backpack","A durable everyday backpack with plenty of room.",29.5,"https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=700"],["Smart Watch","A sleek watch for notifications and everyday activity.",54,"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=700"],["Running Shoes","Lightweight trainers designed for daily comfort.",64.99,"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=700"],["Desk Lamp","Minimal LED desk lamp for work and study.",22,"https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=700"],["Travel Bottle","Reusable stainless-steel bottle for everyday use.",15.75,"https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=700"]];if(!db.prepare("select count(*) n from products").get().n){const ins=db.prepare("insert into products(name,description,price,image) values(?,?,?,?)");seed.forEach(p=>ins.run(...p));}
-app.get("/api/products",(req,res)=>res.json(db.prepare("select * from products order by id").all()));
-app.post("/api/checkout",(req,res)=>{const {customer,items}=req.body||{};if(!customer?.name||!customer?.email||!customer?.address||!Array.isArray(items)||!items.length)return res.status(400).json({error:"Complete your details and add items to your cart."});try{db.exec("BEGIN");let total=0;const rows=items.map(i=>{const p=db.prepare("select * from products where id=?").get(Number(i.id));const q=Math.floor(Number(i.quantity));if(!p||q<1||q>99)throw Error("Invalid cart item");total+=p.price*q;return {p,q}});db.prepare("insert into customers(name,email,address) values(?,?,?) on conflict(email) do update set name=excluded.name,address=excluded.address").run(customer.name.trim(),customer.email.trim(),customer.address.trim());const c=db.prepare("select id from customers where email=?").get(customer.email.trim());const o=db.prepare("insert into orders(customer_id,total) values(?,?)").run(c.id,total);const ins=db.prepare("insert into order_items(order_id,product_id,quantity,unit_price) values(?,?,?,?)");rows.forEach(x=>ins.run(o.lastInsertRowid,x.p.id,x.q,x.p.price));db.exec("COMMIT");res.status(201).json({message:"Order placed successfully!",orderId:Number(o.lastInsertRowid),total})}catch(e){try{db.exec("ROLLBACK")}catch{}res.status(400).json({error:e.message})}});
-app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));app.listen(PORT,()=>console.log("QuickCart listening on "+PORT));
+const express = require("express");
+const { DatabaseSync } = require("node:sqlite");
+const crypto = require("node:crypto");
+const path = require("node:path");
+
+const app = express();
+const db = new DatabaseSync(process.env.DB_PATH || "quickcart.db");
+const PORT = Number(process.env.PORT || 3000);
+const SESSION_DAYS = 7;
+app.disable("x-powered-by");
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: false }));
+
+db.exec(`
+PRAGMA foreign_keys = ON;
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('buyer','seller','admin')),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  price REAL NOT NULL CHECK(price >= 0),
+  image TEXT NOT NULL,
+  seller_id INTEGER REFERENCES users(id),
+  stock INTEGER NOT NULL DEFAULT 20 CHECK(stock >= 0),
+  category TEXT NOT NULL DEFAULT 'Everyday',
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS customers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+  address TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id INTEGER NOT NULL REFERENCES customers(id),
+  user_id INTEGER REFERENCES users(id),
+  total REAL NOT NULL CHECK(total >= 0),
+  status TEXT NOT NULL DEFAULT 'placed',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS order_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL REFERENCES products(id),
+  quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 99),
+  unit_price REAL NOT NULL CHECK(unit_price >= 0)
+);
+`);
+
+function addColumnIfMissing(table, column, definition) {
+  const columns = db.prepare("PRAGMA table_info(" + table + ")").all();
+  if (!columns.some(c => c.name === column)) db.exec("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+}
+addColumnIfMissing("products", "seller_id", "INTEGER REFERENCES users(id)");
+addColumnIfMissing("products", "stock", "INTEGER NOT NULL DEFAULT 20");
+addColumnIfMissing("products", "category", "TEXT NOT NULL DEFAULT 'Everyday'");
+addColumnIfMissing("products", "active", "INTEGER NOT NULL DEFAULT 1");
+addColumnIfMissing("orders", "user_id", "INTEGER REFERENCES users(id)");
+addColumnIfMissing("orders", "status", "TEXT NOT NULL DEFAULT 'placed'");
+
+const seed = [
+ ["Wireless Headphones","Comfortable over-ear headphones with clear sound.",39.99,"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=700","Work & tech",20],
+ ["Classic Backpack","A durable everyday backpack with plenty of room.",29.5,"https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=700","Everyday carry",20],
+ ["Smart Watch","A sleek watch for notifications and everyday activity.",54,"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=700","Work & tech",20],
+ ["Running Shoes","Lightweight trainers designed for daily comfort.",64.99,"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=700","Everyday carry",20],
+ ["Desk Lamp","Minimal LED desk lamp for work and study.",22,"https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=700","Home & living",20],
+ ["Travel Bottle","Reusable stainless-steel bottle for everyday use.",15.75,"https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=700","Everyday carry",20]
+];
+if (!db.prepare("SELECT COUNT(*) AS n FROM products").get().n) {
+  const insert = db.prepare("INSERT INTO products(name,description,price,image,category,stock) VALUES(?,?,?,?,?,?)");
+  seed.forEach(p => insert.run(...p));
+}
+
+const cleanUser = user => user ? ({ id:user.id, name:user.name, email:user.email, role:user.role, createdAt:user.created_at }) : null;
+const hashToken = token => crypto.createHash("sha256").update(token).digest("hex");
+function passwordHash(password, salt = crypto.randomBytes(16).toString("hex")) {
+  const derived = crypto.scryptSync(password, salt, 64).toString("hex");
+  return salt + ":" + derived;
+}
+function passwordMatches(password, stored) {
+  const [salt, expected] = String(stored).split(":");
+  if (!salt || !expected) return false;
+  const actual = Buffer.from(crypto.scryptSync(password, salt, 64).toString("hex"), "hex");
+  const wanted = Buffer.from(expected, "hex");
+  return actual.length === wanted.length && crypto.timingSafeEqual(actual, wanted);
+}
+function cookieOptions(maxAge) {
+  return ["Path=/","HttpOnly","SameSite=Lax","Max-Age=" + maxAge, ...(process.env.NODE_ENV === "production" ? ["Secure"] : [])].join("; ");
+}
+function readCookie(req, name) {
+  const raw = req.headers.cookie || "";
+  for (const part of raw.split(";")) {
+    const idx = part.indexOf("=");
+    if (idx < 0) continue;
+    if (part.slice(0,idx).trim() === name) return decodeURIComponent(part.slice(idx+1).trim());
+  }
+  return null;
+}
+function auth(req,res,next) {
+  const token = readCookie(req,"qc_session");
+  if (!token) return res.status(401).json({error:"Please sign in to continue."});
+  const session = db.prepare(`SELECT u.id,u.name,u.email,u.role,u.created_at
+    FROM sessions s JOIN users u ON u.id=s.user_id
+    WHERE s.token_hash=? AND s.expires_at>?`).get(hashToken(token),Date.now());
+  if (!session) {
+    res.setHeader("Set-Cookie","qc_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+    return res.status(401).json({error:"Your session has expired. Please sign in again."});
+  }
+  req.user=session; next();
+}
+const requireRole = role => (req,res,next) => req.user.role===role || req.user.role==="admin" ? next() : res.status(403).json({error:"This action is only available to " + role + " accounts."});
+const validText = (v,max=500) => typeof v==="string" && v.trim().length>0 && v.trim().length<=max;
+const emailOk = v => typeof v==="string" && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(v);
+const publicProduct = p => ({...p, price:Number(p.price), stock:Number(p.stock), seller_id:p.seller_id===null?null:Number(p.seller_id), active:Boolean(p.active)});
+
+app.get("/api/health",(req,res)=>res.json({status:"ok",database:"connected",timestamp:new Date().toISOString()}));
+
+app.post("/api/auth/register",(req,res)=>{
+  const {name,email,password,role="buyer"}=req.body||{};
+  if(!validText(name,100)||!emailOk(email)||typeof password!=="string"||password.length<8||password.length>200||!["buyer","seller"].includes(role))
+    return res.status(400).json({error:"Enter your name, a valid email, a password of at least 8 characters, and choose buyer or seller."});
+  try{
+    const result=db.prepare("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,?)").run(name.trim(),email.trim().toLowerCase(),passwordHash(password),role);
+    const user=db.prepare("SELECT id,name,email,role,created_at FROM users WHERE id=?").get(result.lastInsertRowid);
+    const token=crypto.randomBytes(32).toString("base64url");
+    db.prepare("INSERT INTO sessions(user_id,token_hash,expires_at) VALUES(?,?,?)").run(user.id,hashToken(token),Date.now()+SESSION_DAYS*86400000);
+    res.setHeader("Set-Cookie","qc_session="+encodeURIComponent(token)+"; "+cookieOptions(SESSION_DAYS*86400));
+    res.status(201).json({user:cleanUser(user),message:"Account created. Welcome to QuickCart."});
+  }catch(e){if(String(e.message).includes("UNIQUE"))return res.status(409).json({error:"An account with that email already exists."});res.status(500).json({error:"Could not create account."});}
+});
+app.post("/api/auth/login",(req,res)=>{
+  const {email,password}=req.body||{};
+  if(!emailOk(email)||typeof password!=="string")return res.status(400).json({error:"Enter your email and password."});
+  const user=db.prepare("SELECT * FROM users WHERE email=? COLLATE NOCASE").get(email.trim());
+  if(!user||!passwordMatches(password,user.password_hash))return res.status(401).json({error:"Email or password is incorrect."});
+  const token=crypto.randomBytes(32).toString("base64url");
+  db.prepare("INSERT INTO sessions(user_id,token_hash,expires_at) VALUES(?,?,?)").run(user.id,hashToken(token),Date.now()+SESSION_DAYS*86400000);
+  res.setHeader("Set-Cookie","qc_session="+encodeURIComponent(token)+"; "+cookieOptions(SESSION_DAYS*86400));
+  res.json({user:cleanUser(user),message:"Signed in successfully."});
+});
+app.post("/api/auth/logout",(req,res)=>{
+  const token=readCookie(req,"qc_session"); if(token)db.prepare("DELETE FROM sessions WHERE token_hash=?").run(hashToken(token));
+  res.setHeader("Set-Cookie","qc_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");res.json({message:"Signed out."});
+});
+app.get("/api/auth/me",auth,(req,res)=>res.json({user:cleanUser(req.user)}));
+
+app.get("/api/products",(req,res)=>{
+  const rows=db.prepare("SELECT p.id,p.name,p.description,p.price,p.image,p.seller_id,p.stock,p.category,p.active,u.name AS seller_name FROM products p LEFT JOIN users u ON u.id=p.seller_id WHERE p.active=1 AND p.stock>0 ORDER BY p.id DESC").all();
+  res.json(rows.map(publicProduct));
+});
+app.get("/api/seller/products",auth,requireRole("seller"),(req,res)=>{
+  const rows=db.prepare("SELECT * FROM products WHERE seller_id=? ORDER BY created_at DESC,id DESC").all(req.user.id);
+  res.json(rows.map(publicProduct));
+});
+app.post("/api/seller/products",auth,requireRole("seller"),(req,res)=>{
+  const {name,description,price,image,stock=0,category="Everyday"}=req.body||{};
+  const p=Number(price),q=Number(stock);
+  if(!validText(name,120)||!validText(description,2000)||!Number.isFinite(p)||p<0||p>100000000||!validText(image,2000)||!Number.isInteger(q)||q<0||q>1000000||!validText(category,60))
+    return res.status(400).json({error:"Check the product name, description, image URL, price, category and stock quantity."});
+  const result=db.prepare("INSERT INTO products(name,description,price,image,seller_id,stock,category) VALUES(?,?,?,?,?,?,?)").run(name.trim(),description.trim(),p,image.trim(),req.user.id,q,category.trim());
+  res.status(201).json({product:publicProduct(db.prepare("SELECT * FROM products WHERE id=?").get(result.lastInsertRowid)),message:"Product listed."});
+});
+app.patch("/api/seller/products/:id",auth,requireRole("seller"),(req,res)=>{
+  const id=Number(req.params.id),existing=db.prepare("SELECT * FROM products WHERE id=? AND seller_id=?").get(id,req.user.id);
+  if(!existing)return res.status(404).json({error:"Product not found in your shop."});
+  const allowed=["name","description","price","image","stock","category"];
+  const patch=req.body||{};if(!Object.keys(patch).length||Object.keys(patch).some(k=>!allowed.includes(k)))return res.status(400).json({error:"Only name, description, price, image, stock and category can be updated."});
+  const next={...existing,...patch};
+  if(!validText(next.name,120)||!validText(next.description,2000)||!Number.isFinite(Number(next.price))||Number(next.price)<0||!validText(next.image,2000)||!Number.isInteger(Number(next.stock))||Number(next.stock)<0||!validText(next.category,60))return res.status(400).json({error:"Invalid product details or stock quantity."});
+  db.prepare("UPDATE products SET name=?,description=?,price=?,image=?,stock=?,category=? WHERE id=? AND seller_id=?").run(next.name.trim(),next.description.trim(),Number(next.price),next.image.trim(),Number(next.stock),next.category.trim(),id,req.user.id);
+  res.json({product:publicProduct(db.prepare("SELECT * FROM products WHERE id=?").get(id)),message:"Product updated."});
+});
+app.delete("/api/seller/products/:id",auth,requireRole("seller"),(req,res)=>{
+  const result=db.prepare("UPDATE products SET active=0 WHERE id=? AND seller_id=? AND active=1").run(Number(req.params.id),req.user.id);
+  if(!result.changes)return res.status(404).json({error:"Product not found in your shop."});
+  res.json({message:"Product removed from your storefront."});
+});
+app.get("/api/seller/orders",auth,requireRole("seller"),(req,res)=>{
+  const rows=db.prepare(`SELECT o.id,o.status,o.total,o.created_at,c.name AS customer_name,c.email AS customer_email,
+    oi.product_id,oi.quantity,oi.unit_price,p.name AS product_name
+    FROM orders o JOIN customers c ON c.id=o.customer_id
+    JOIN order_items oi ON oi.order_id=o.id JOIN products p ON p.id=oi.product_id
+    WHERE p.seller_id=? ORDER BY o.created_at DESC,o.id DESC`).all(req.user.id);
+  res.json(rows.map(r=>({...r,total:Number(r.total),unit_price:Number(r.unit_price)})));
+});
+
+app.post("/api/checkout",(req,res)=>{
+  const {customer,items}=req.body||{};
+  if(!customer?.name||!emailOk(customer.email)||!customer?.address||!Array.isArray(items)||!items.length)return res.status(400).json({error:"Complete your details and add items to your cart."});
+  const token=readCookie(req,"qc_session");
+  const user=token?db.prepare("SELECT u.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?").get(hashToken(token),Date.now()):null;
+  try{
+    db.exec("BEGIN IMMEDIATE");let total=0;
+    const rows=items.map(i=>{
+      const id=Number(i.id),q=Number(i.quantity);
+      if(!Number.isInteger(id)||!Number.isInteger(q)||q<1||q>99)throw Error("Invalid cart item.");
+      const p=db.prepare("SELECT * FROM products WHERE id=? AND active=1").get(id);
+      if(!p)throw Error("A product in your cart is no longer available.");
+      if(p.stock<q)throw Error("Not enough stock for "+p.name+". Available: "+p.stock+".");
+      total+=p.price*q;return {p,q};
+    });
+    const email=customer.email.trim().toLowerCase();
+    db.prepare("INSERT INTO customers(name,email,address) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,address=excluded.address").run(customer.name.trim(),email,customer.address.trim());
+    const c=db.prepare("SELECT id FROM customers WHERE email=?").get(email);
+    const o=db.prepare("INSERT INTO orders(customer_id,user_id,total) VALUES(?,?,?)").run(c.id,user?.id||null,total);
+    const ins=db.prepare("INSERT INTO order_items(order_id,product_id,quantity,unit_price) VALUES(?,?,?,?)");
+    const dec=db.prepare("UPDATE products SET stock=stock-? WHERE id=? AND stock>=?");
+    rows.forEach(x=>{ins.run(o.lastInsertRowid,x.p.id,x.q,x.p.price);const changed=dec.run(x.q,x.p.id,x.q);if(!changed.changes)throw Error("Stock changed while checking out. Please try again.");});
+    db.exec("COMMIT");res.status(201).json({message:"Order placed successfully!",orderId:Number(o.lastInsertRowid),total});
+  }catch(e){try{db.exec("ROLLBACK")}catch{}res.status(400).json({error:e.message});}
+});
+app.get("/api/orders",auth,(req,res)=>{
+  const rows=db.prepare("SELECT id,total,status,created_at FROM orders WHERE user_id=? ORDER BY created_at DESC,id DESC").all(req.user.id);
+  res.json(rows.map(r=>({...r,total:Number(r.total)})));
+});
+app.use("/api/*",(req,res)=>res.status(404).json({error:"API route not found."}));
+app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
+app.use((err,req,res,next)=>{console.error(err);res.status(500).json({error:"Something went wrong. Please try again."});});
+const cleanup=setInterval(()=>db.prepare("DELETE FROM sessions WHERE expires_at<=?").run(Date.now()),3600000);
+cleanup.unref();
+app.listen(PORT,"0.0.0.0",()=>console.log("QuickCart API and storefront listening on "+PORT));
