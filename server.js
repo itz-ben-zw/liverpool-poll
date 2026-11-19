@@ -133,7 +133,7 @@ function auth(req,res,next) {
 }
 const requireRole = role => (req,res,next) => req.user.role===role || req.user.role==="admin" ? next() : res.status(403).json({error:"This action is only available to " + role + " accounts."});
 const validText = (v,max=500) => typeof v==="string" && v.trim().length>0 && v.trim().length<=max;
-const emailOk = v => typeof v==="string" && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(v);
+const emailOk = v => typeof v==="string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const publicProduct = p => ({...p, price:Number(p.price), stock:Number(p.stock), seller_id:p.seller_id===null?null:Number(p.seller_id), active:Boolean(p.active)});
 
 app.get("/api/health",(req,res)=>res.json({status:"ok",database:"connected",timestamp:new Date().toISOString()}));
