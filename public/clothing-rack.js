@@ -35,7 +35,7 @@ function initRack(product,colours){
  }
  function setFrontBack(){
   const colour=colours[active],image=garments[active]?.querySelector("img"),url=front?(colour.frontImage||colour.sizes.find(v=>v.frontImage)?.frontImage):(colour.backImage||colour.sizes.find(v=>v.backImage)?.backImage);
-  byId("rackFront").setAttribute("aria-pressed",String(front));byId("rackBack").setAttribute("aria-pressed",String(!front));
+  byId("rackFront").setAttribute("aria-pressed",String(front));byId("rackBack").setAttribute("aria-pressed",String(!front));byId("rackBack").disabled=!(colour.backImage||colour.sizes.some(v=>v.backImage));
   if(image&&url&&image.src!==url){if(!reduced)image.classList.add("is-turning");setTimeout(()=>{image.src=url;image.alt=product.name+" in "+colour.name+" "+(front?"front":"back")+" view";image.classList.remove("is-turning");},reduced?0:250);}
  }
  function updatePanel(){
@@ -47,7 +47,7 @@ function initRack(product,colours){
  }
  function syncStock(){
   selectedSize=(colours[active].sizes||[]).find(v=>Number(v.id)===Number(sizeSelect.value))||selectedSize;
-  const stock=Number(selectedSize?.stock||0);byId("rackStock").textContent=stock>0?(stock<=3?"Only "+stock+" left":"In stock · "+stock+" available"):"This size is sold out";
+  const stock=Number(selectedSize?.stock||0);byId("rackPrice").textContent="$"+(Number(product.price)+Number(selectedSize?.priceAdjustment||0)).toFixed(2);byId("rackStock").textContent=stock>0?(stock<=3?"Only "+stock+" left":"In stock · "+stock+" available"):"This size is sold out";
   add.disabled=!selectedSize||stock<1;add.textContent=stock>0?"Add "+colours[active].name+" / "+selectedSize.size+" to bag":"Sold out";
  }
  function go(index){active=Math.max(0,Math.min(colours.length-1,index));const start=position;const end=active;if(reduced){position=end;updatePanel();return;}const began=performance.now(),duration=560;function animate(now){const t=Math.min(1,(now-began)/duration),ease=1-Math.pow(1-t,4);position=start+(end-start)*ease;render();if(t<1)raf=requestAnimationFrame(animate);else{position=end;updatePanel();}}cancelAnimationFrame(raf);raf=requestAnimationFrame(animate);}
@@ -64,7 +64,7 @@ function initRack(product,colours){
 }
 function rackRenderCart(){
  const count=cart.reduce((s,i)=>s+i.quantity,0);byId("count").textContent=count;
- byId("items").innerHTML=cart.length?cart.map((item,index)=>{const p=products.find(x=>Number(x.id)===Number(item.id));if(!p)return "";const variant=variantFor(p,item.variantId),label=item.variantLabel||variant?.colour&&variant?.size?(item.variantLabel||variant.colour+" / "+variant.size):"",price=Number(p.price)+Number(item.priceAdjustment||variant?.priceAdjustment||0);return '<div class="cart-row"><span>'+esc(p.name)+(label?'<small class="cart-variant-label">'+esc(label)+'</small>':'')+'<div class="cart-qty"><button data-rack-cart-qty="-1" data-index="'+index+'" aria-label="Decrease quantity">−</button><b>'+item.quantity+'</b><button data-rack-cart-qty="1" data-index="'+index+'" aria-label="Increase quantity">+</button></div></span><span>$'+(price*item.quantity).toFixed(2)+' <button data-rack-cart-remove="'+index+'">Remove</button></span></div>';}).join(""):"Your bag is empty.";
+ byId("items").innerHTML=cart.length?cart.map((item,index)=>{const p=products.find(x=>Number(x.id)===Number(item.id));if(!p)return "";const variant=variantFor(p,item.variantId),label=item.variantLabel||(variant?.colour&&variant?.size?variant.colour+" / "+variant.size:""),price=Number(p.price)+Number(item.priceAdjustment||variant?.priceAdjustment||0);return '<div class="cart-row"><span>'+esc(p.name)+(label?'<small class="cart-variant-label">'+esc(label)+'</small>':'')+'<div class="cart-qty"><button data-rack-cart-qty="-1" data-index="'+index+'" aria-label="Decrease quantity">−</button><b>'+item.quantity+'</b><button data-rack-cart-qty="1" data-index="'+index+'" aria-label="Increase quantity">+</button></div></span><span>$'+(price*item.quantity).toFixed(2)+' <button data-rack-cart-remove="'+index+'">Remove</button></span></div>';}).join(""):"Your bag is empty.";
  byId("total").textContent=cart.reduce((sum,item)=>{const p=products.find(x=>Number(x.id)===Number(item.id));return sum+(p?(Number(p.price)+Number(item.priceAdjustment||0))*item.quantity:0);},0).toFixed(2);
 }
 window.renderCart=rackRenderCart;
