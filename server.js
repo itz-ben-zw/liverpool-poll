@@ -1,439 +1,198 @@
 const express = require("express");
-const { DatabaseSync } = require("node:sqlite");
+const { Pool } = require("pg");
 const crypto = require("node:crypto");
 const { OAuth2Client } = require("google-auth-library");
 const path = require("node:path");
 
 const app = express();
-const db = new DatabaseSync(process.env.DB_PATH || "quickcart.db");
 const PORT = Number(process.env.PORT || 3000);
+if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for STND PostgreSQL.");
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined, max: 3, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000 });
+pool.on("error", e => console.error("[database] pool error:", e.code || "unknown"));
+const ADMIN_EMAIL = String(process.env.STND_ADMIN_EMAIL || "").trim().toLowerCase();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || (process.env.NODE_ENV === "production" ? "https://quickcart-ecommerce-gu1i.onrender.com/auth/google/callback" : "http://localhost:3000/auth/google/callback");
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || (process.env.NODE_ENV === "production" ? "https://stnd-store.onrender.com/auth/google/callback" : "http://localhost:3000/auth/google/callback");
+const COOKIE = "stnd_session";
 const SESSION_DAYS = 7;
-const PESEPAY_INTEGRATION_KEY = process.env.PESEPAY_INTEGRATION_KEY || "";
-const PESEPAY_ENCRYPTION_KEY = process.env.PESEPAY_ENCRYPTION_KEY || "";
-const PESEPAY_ENVIRONMENT = process.env.PESEPAY_ENVIRONMENT || "sandbox";
-const PESEPAY_BASE_URL = PESEPAY_ENVIRONMENT === "live" ? "https://api.pesepay.com/api/payments-engine/v1" : "https://api.test.sandbox.pesepay.com/payments-engine/v1";
-const APP_BASE_URL = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:"+PORT;
+const PAY_KEY = process.env.PESEPAY_INTEGRATION_KEY || "";
+const PAY_ENCRYPTION = process.env.PESEPAY_ENCRYPTION_KEY || "";
+const PAY_LIVE = process.env.PESEPAY_ENVIRONMENT === "live";
+const PAY_URL = PAY_LIVE ? "https://api.pesepay.com/api/payments-engine/v1" : "https://api.test.sandbox.pesepay.com/payments-engine/v1";
+const APP_URL = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:" + PORT;
+const payReady = () => Boolean(PAY_KEY && PAY_ENCRYPTION.length === 32);
+
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false }));
 
-db.exec(`
-PRAGMA foreign_keys = ON;
-CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL COLLATE NOCASE UNIQUE,
-  password_hash TEXT NOT NULL,
-  google_sub TEXT,
-  role TEXT NOT NULL CHECK(role IN ('buyer','seller','admin')),
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS sessions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash TEXT NOT NULL UNIQUE,
-  expires_at INTEGER NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS products (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  description TEXT NOT NULL,
-  price REAL NOT NULL CHECK(price >= 0),
-  image TEXT NOT NULL,
-  seller_id INTEGER REFERENCES users(id),
-  stock INTEGER NOT NULL DEFAULT 20 CHECK(stock >= 0),
-  category TEXT NOT NULL DEFAULT 'Everyday',
-  active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS customers (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL COLLATE NOCASE UNIQUE,
-  address TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS orders (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  customer_id INTEGER NOT NULL REFERENCES customers(id),
-  user_id INTEGER REFERENCES users(id),
-  total REAL NOT NULL CHECK(total >= 0),
-  status TEXT NOT NULL DEFAULT 'placed',
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS order_items (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id INTEGER NOT NULL REFERENCES products(id),
-  quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 99),
-  unit_price REAL NOT NULL CHECK(unit_price >= 0)
-);
-`);
-
-function addColumnIfMissing(table, column, definition) {
-  const columns = db.prepare("PRAGMA table_info(" + table + ")").all();
-  if (!columns.some(c => c.name === column)) db.exec("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
-}
-addColumnIfMissing("users", "google_sub", "TEXT");
-db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub_unique ON users(google_sub) WHERE google_sub IS NOT NULL;");
-addColumnIfMissing("products", "seller_id", "INTEGER REFERENCES users(id)");
-addColumnIfMissing("products", "stock", "INTEGER NOT NULL DEFAULT 20");
-addColumnIfMissing("products", "category", "TEXT NOT NULL DEFAULT 'Everyday'");
-addColumnIfMissing("products", "active", "INTEGER NOT NULL DEFAULT 1");
-addColumnIfMissing("orders", "user_id", "INTEGER REFERENCES users(id)");
-addColumnIfMissing("orders", "status", "TEXT NOT NULL DEFAULT 'placed'");
-addColumnIfMissing("orders", "payment_reference", "TEXT");
-addColumnIfMissing("orders", "payment_provider", "TEXT");
-db.exec("CREATE UNIQUE INDEX IF NOT EXISTS orders_payment_reference_unique ON orders(payment_reference) WHERE payment_reference IS NOT NULL;");
-
-const seed = [
- ["Essential Oversized Tee","A heavyweight cotton jersey tee with a relaxed, considered silhouette.",88,"https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=900&q=85","Men",18],
- ["Relaxed Tailored Trousers","Clean lines and a relaxed drape, cut for everyday versatility.",148,"https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=900&q=85","Men",14],
- ["Structured Knit Polo","A refined knit polo with a soft hand-feel and understated finish.",125,"https://images.unsplash.com/photo-1627225924765-552d49cf47ad?w=900&q=85","Men",12],
- ["Leather Court Sneakers","Minimal low-top sneakers designed to work beyond one season.",165,"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=900&q=85","Footwear",10],
- ["Draped Midi Dress","An effortless silhouette with fluid movement and a clean neckline.",178,"https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=900&q=85","Women",9],
- ["Everyday Leather Tote","A structured carryall with room for the everyday essentials.",135,"https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=900&q=85","Accessories",11]
-];
-// Convert the original demo catalogue to the STND. launch collection without touching seller-owned listings.
-const legacyFashion = [
- ["Wireless Headphones","Essential Oversized Tee","A heavyweight cotton jersey tee with a relaxed, considered silhouette.",88,"https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=900&q=85","Men"],
- ["Classic Backpack","Relaxed Tailored Trousers","Clean lines and a relaxed drape, cut for everyday versatility.",148,"https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=900&q=85","Men"],
- ["Smart Watch","Structured Knit Polo","A refined knit polo with a soft hand-feel and understated finish.",125,"https://images.unsplash.com/photo-1627225924765-552d49cf47ad?w=900&q=85","Men"],
- ["Running Shoes","Leather Court Sneakers","Minimal low-top sneakers designed to work beyond one season.",165,"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=900&q=85","Footwear"],
- ["Desk Lamp","Draped Midi Dress","An effortless silhouette with fluid movement and a clean neckline.",178,"https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=900&q=85","Women"],
- ["Travel Bottle","Everyday Leather Tote","A structured carryall with room for the everyday essentials.",135,"https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=900&q=85","Accessories"]
-];
-const migrateLegacy = db.prepare("UPDATE products SET name=?,description=?,price=?,image=?,category=? WHERE name=? AND seller_id IS NULL");
-for (const [oldName,name,description,price,image,category] of legacyFashion) migrateLegacy.run(name,description,price,image,category,oldName);
-
-if (!db.prepare("SELECT COUNT(*) AS n FROM products").get().n) {
-  const insert = db.prepare("INSERT INTO products(name,description,price,image,category,stock) VALUES(?,?,?,?,?,?)");
-  seed.forEach(p => insert.run(...p));
-}
-
-const cleanUser = user => user ? ({ id:user.id, name:user.name, email:user.email, role:user.role, createdAt:user.created_at }) : null;
-const hashToken = token => crypto.createHash("sha256").update(token).digest("hex");
-function passwordHash(password, salt = crypto.randomBytes(16).toString("hex")) {
-  const derived = crypto.scryptSync(password, salt, 64).toString("hex");
-  return salt + ":" + derived;
-}
-function passwordMatches(password, stored) {
-  const [salt, expected] = String(stored).split(":");
+const validText = (v, n=500) => typeof v === "string" && v.trim().length > 0 && v.trim().length <= n;
+const validEmail = v => typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+const hash = v => crypto.createHash("sha256").update(v).digest("hex");
+const cleanUser = u => u && ({ id:Number(u.id), name:u.name, email:u.email, role:u.role, createdAt:u.created_at, address:u.address || "", phone:u.phone || "" });
+const cleanProduct = p => ({ ...p, id:Number(p.id), price:Number(p.price), stock:Number(p.stock), featured:Boolean(p.featured), active:p.status === "active" });
+const passwordHash = (p, salt=crypto.randomBytes(16).toString("hex")) => salt + ":" + crypto.scryptSync(p,salt,64).toString("hex");
+function passwordMatches(p, stored) {
+  if (!stored) return false;
+  const [salt, expected] = stored.split(":");
   if (!salt || !expected) return false;
-  const actual = Buffer.from(crypto.scryptSync(password, salt, 64).toString("hex"), "hex");
-  const wanted = Buffer.from(expected, "hex");
-  return actual.length === wanted.length && crypto.timingSafeEqual(actual, wanted);
+  const a=Buffer.from(crypto.scryptSync(p,salt,64).toString("hex"),"hex"), b=Buffer.from(expected,"hex");
+  return a.length===b.length && crypto.timingSafeEqual(a,b);
 }
-function cookieOptions(maxAge) {
-  return ["Path=/","HttpOnly","SameSite=Lax","Max-Age=" + maxAge, ...(process.env.NODE_ENV === "production" ? ["Secure"] : [])].join("; ");
-}
-function readCookie(req, name) {
-  const raw = req.headers.cookie || "";
-  for (const part of raw.split(";")) {
-    const idx = part.indexOf("=");
-    if (idx < 0) continue;
-    if (part.slice(0,idx).trim() === name) return decodeURIComponent(part.slice(idx+1).trim());
-  }
+function cookieOpts(age) { return ["Path=/","HttpOnly","SameSite=Lax","Max-Age="+age,...(process.env.NODE_ENV==="production"?["Secure"]:[])].join("; "); }
+function readCookie(req,name) {
+  for (const p of String(req.headers.cookie||"").split(";")) { const i=p.indexOf("="); if(i>=0&&p.slice(0,i).trim()===name)return decodeURIComponent(p.slice(i+1).trim()); }
   return null;
 }
-function auth(req,res,next) {
-  const token = readCookie(req,"qc_session");
-  if (!token) return res.status(401).json({error:"Please sign in to continue."});
-  const session = db.prepare(`SELECT u.id,u.name,u.email,u.role,u.created_at
-    FROM sessions s JOIN users u ON u.id=s.user_id
-    WHERE s.token_hash=? AND s.expires_at>?`).get(hashToken(token),Date.now());
-  if (!session) {
-    res.setHeader("Set-Cookie","qc_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
-    return res.status(401).json({error:"Your session has expired. Please sign in again."});
-  }
-  req.user=session; next();
-}
-const requireRole = role => (req,res,next) => req.user.role===role || req.user.role==="admin" ? next() : res.status(403).json({error:"This action is only available to " + role + " accounts."});
-const validText = (v,max=500) => typeof v==="string" && v.trim().length>0 && v.trim().length<=max;
-const emailOk = v => typeof v==="string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-const publicProduct = p => ({...p, price:Number(p.price), stock:Number(p.stock), seller_id:p.seller_id===null?null:Number(p.seller_id), active:Boolean(p.active)});
-
-function pesepayReady(){return Boolean(PESEPAY_INTEGRATION_KEY && PESEPAY_ENCRYPTION_KEY && PESEPAY_ENCRYPTION_KEY.length===32);}
-function encryptPesepay(value){
-  const cipher=crypto.createCipheriv("aes-256-cbc",Buffer.from(PESEPAY_ENCRYPTION_KEY,"utf8"),Buffer.from(PESEPAY_ENCRYPTION_KEY.slice(0,16),"utf8"));
-  return Buffer.concat([cipher.update(JSON.stringify(value),"utf8"),cipher.final()]).toString("base64");
-}
-function decryptPesepay(value){
-  const decipher=crypto.createDecipheriv("aes-256-cbc",Buffer.from(PESEPAY_ENCRYPTION_KEY,"utf8"),Buffer.from(PESEPAY_ENCRYPTION_KEY.slice(0,16),"utf8"));
-  return JSON.parse(Buffer.concat([decipher.update(Buffer.from(value,"base64")),decipher.final()]).toString("utf8"));
-}
-async function pesepayRequest(url,options={}){
-  const response=await fetch(url,{...options,headers:{authorization:PESEPAY_INTEGRATION_KEY,"content-type":"application/json",...(options.headers||{})}});
-  const body=await response.json().catch(()=>({}));
-  if(!response.ok)throw Error(body.message||body.error||("Pesepay request failed ("+response.status+")."));
-  return body;
-}
-async function initiatePesepayPayment(orderId,total){
-  const payload=encryptPesepay({amountDetails:{amount:Number(total.toFixed(2)),currencyCode:"USD"},reasonForPayment:"STND. order #"+orderId,merchantReference:"STND-"+orderId,resultUrl:APP_BASE_URL+"/payments/pesepay/result",returnUrl:APP_BASE_URL+"/payment/return?order="+orderId});
-  const body=await pesepayRequest(PESEPAY_BASE_URL+"/payments/initiate",{method:"POST",body:JSON.stringify({payload})});
-  if(!body.payload)throw Error("Pesepay did not return a checkout payload.");
-  const result=decryptPesepay(body.payload);
-  if(!result.referenceNumber||!result.redirectUrl)throw Error("Pesepay returned an incomplete checkout response.");
-  db.prepare("UPDATE orders SET payment_reference=?,payment_provider='pesepay',status='pending_payment' WHERE id=?").run(result.referenceNumber,orderId);
-  return result;
-}
-async function confirmPesepayPayment(referenceNumber){
-  if(!pesepayReady())throw Error("Pesepay sandbox is not configured.");
-  const url=new URL(PESEPAY_BASE_URL+"/payments/check-payment");
-  url.searchParams.set("referenceNumber",referenceNumber);
-  const body=await pesepayRequest(url.toString());
-  if(!body.payload)throw Error("Pesepay status response was incomplete.");
-  return decryptPesepay(body.payload);
-}
-function settlePesepayResult(result){
-  const order=db.prepare("SELECT * FROM orders WHERE payment_reference=?").get(result.referenceNumber);
-  if(!order)return {ignored:true};
-  if(order.status==="paid")return {alreadyPaid:true};
-  const amount=Number(result.amountDetails?.amount);
-  const currency=String(result.amountDetails?.currencyCode||"").toUpperCase();
-  if(currency!=="USD"||!Number.isFinite(amount)||Math.abs(amount-Number(order.total))>0.009)throw Error("Pesepay amount or currency did not match the order.");
-  if(result.transactionStatus==="SUCCESS"){
-    db.prepare("UPDATE orders SET status='paid' WHERE id=? AND status!='paid'").run(order.id);
-    return {paid:true,orderId:order.id};
-  }
-  if(["FAILED","CANCELLED","REVERSED","EXPIRED"].includes(String(result.transactionStatus||"").toUpperCase())){
-    db.exec("BEGIN IMMEDIATE");
-    try{
-      const changed=db.prepare("UPDATE orders SET status='payment_failed' WHERE id=? AND status='pending_payment'").run(order.id);
-      if(changed.changes){
-        const rows=db.prepare("SELECT product_id,quantity FROM order_items WHERE order_id=?").all(order.id);
-        const restore=db.prepare("UPDATE products SET stock=stock+? WHERE id=?");
-        rows.forEach(item=>restore.run(item.quantity,item.product_id));
-      }
-      db.exec("COMMIT");
-    }catch(e){try{db.exec("ROLLBACK")}catch{}throw e;}
-  }
-  return {status:result.transactionStatus||"PENDING",orderId:order.id};
-}
-app.get("/api/health",(req,res)=>res.json({status:"ok",database:"connected",payments:pesepayReady()?"sandbox_configured":"not_configured",timestamp:new Date().toISOString()}));
-
-app.post("/api/auth/register",(req,res)=>{
-  const {name,email,password,role="buyer"}=req.body||{};
-  if(!validText(name,100)||!emailOk(email)||typeof password!=="string"||password.length<8||password.length>200||!["buyer","seller"].includes(role))
-    return res.status(400).json({error:"Enter your name, a valid email, a password of at least 8 characters, and choose buyer or seller."});
-  try{
-    const result=db.prepare("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,?)").run(name.trim(),email.trim().toLowerCase(),passwordHash(password),role);
-    const user=db.prepare("SELECT id,name,email,role,created_at FROM users WHERE id=?").get(result.lastInsertRowid);
-    const token=crypto.randomBytes(32).toString("base64url");
-    db.prepare("INSERT INTO sessions(user_id,token_hash,expires_at) VALUES(?,?,?)").run(user.id,hashToken(token),Date.now()+SESSION_DAYS*86400000);
-    res.setHeader("Set-Cookie","qc_session="+encodeURIComponent(token)+"; "+cookieOptions(SESSION_DAYS*86400));
-    res.status(201).json({user:cleanUser(user),message:"Account created. Welcome to QuickCart."});
-  }catch(e){if(String(e.message).includes("UNIQUE"))return res.status(409).json({error:"An account with that email already exists."});res.status(500).json({error:"Could not create account."});}
-});
-app.post("/api/auth/login",(req,res)=>{
-  const {email,password}=req.body||{};
-  if(!emailOk(email)||typeof password!=="string")return res.status(400).json({error:"Enter your email and password."});
-  const user=db.prepare("SELECT * FROM users WHERE email=? COLLATE NOCASE").get(email.trim());
-  if(!user||!passwordMatches(password,user.password_hash))return res.status(401).json({error:"Email or password is incorrect."});
+function setCookie(res,token) { res.setHeader("Set-Cookie",COOKIE+"="+encodeURIComponent(token)+"; "+cookieOpts(SESSION_DAYS*86400)); }
+function clearCookie(res) { res.setHeader("Set-Cookie",COOKIE+"=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"+(process.env.NODE_ENV==="production"?"; Secure":"")); }
+async function createSession(client,userId) {
   const token=crypto.randomBytes(32).toString("base64url");
-  db.prepare("INSERT INTO sessions(user_id,token_hash,expires_at) VALUES(?,?,?)").run(user.id,hashToken(token),Date.now()+SESSION_DAYS*86400000);
-  res.setHeader("Set-Cookie","qc_session="+encodeURIComponent(token)+"; "+cookieOptions(SESSION_DAYS*86400));
-  res.json({user:cleanUser(user),message:"Signed in successfully."});
-});
-function googleOAuthClient() {
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return null;
-  return new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
+  await client.query("insert into public.sessions(user_id,token_hash,expires_at) values($1,$2,$3)",[userId,hash(token),Date.now()+SESSION_DAYS*86400000]);
+  return token;
 }
-function safeEqual(a,b) {
-  if (typeof a !== "string" || typeof b !== "string") return false;
-  const left=Buffer.from(a),right=Buffer.from(b);
-  return left.length===right.length && crypto.timingSafeEqual(left,right);
+async function getSession(token,client=pool) {
+  if(!token)return null;
+  const r=await client.query("select u.id,u.name,u.email,u.role,u.created_at,c.address,c.phone from public.sessions s join public.users u on u.id=s.user_id left join public.customers c on lower(c.email)=lower(u.email) where s.token_hash=$1 and s.expires_at>$2",[hash(token),Date.now()]);
+  return r.rows[0]||null;
 }
-function clearGoogleCookies(res) {
-  const secure=process.env.NODE_ENV==="production" ? "; Secure" : "";
-  ["qc_google_state","qc_google_nonce","qc_google_role"].forEach(name=>res.append("Set-Cookie",name+"=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"+secure));
+async function auth(req,res,next) {
+  try { req.user=await getSession(readCookie(req,COOKIE)); if(!req.user){clearCookie(res);return res.status(401).json({error:"Please sign in to continue."});} next(); }
+  catch(e){next(e);}
 }
-app.get("/auth/google",(req,res)=>{
-  const client=googleOAuthClient();
-  if(!client)return res.redirect("/?google=setup#account");
-  const role=req.query.role==="seller" ? "seller" : "buyer";
-  const state=crypto.randomBytes(32).toString("base64url");
-  const nonce=crypto.randomBytes(32).toString("base64url");
-  const secure=process.env.NODE_ENV==="production" ? "; Secure" : "";
-  res.append("Set-Cookie","qc_google_state="+state+"; Path=/; HttpOnly; SameSite=Lax; Max-Age=600"+secure);
-  res.append("Set-Cookie","qc_google_nonce="+nonce+"; Path=/; HttpOnly; SameSite=Lax; Max-Age=600"+secure);
-  res.append("Set-Cookie","qc_google_role="+role+"; Path=/; HttpOnly; SameSite=Lax; Max-Age=600"+secure);
-  const url=client.generateAuthUrl({access_type:"online",prompt:"select_account",scope:["openid","email","profile"],state,nonce});
-  res.redirect(url);
-});
-app.get("/auth/google/callback",async(req,res)=>{
-  const client=googleOAuthClient();
-  const stateCookie=readCookie(req,"qc_google_state");
-  const nonceCookie=readCookie(req,"qc_google_nonce");
-  const roleCookie=readCookie(req,"qc_google_role");
-  const stateOk=safeEqual(String(req.query.state||""),stateCookie);
-  clearGoogleCookies(res);
-  if(!client || !stateOk || !nonceCookie || typeof req.query.code!=="string" || req.query.error) return res.redirect("/?google=failed#account");
+const adminOnly=(req,res,next)=>req.user.role==="admin"?next():res.status(403).json({error:"STND admin access is required."});
+const asyncRoute=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
+function googleClient(){return GOOGLE_CLIENT_ID&&GOOGLE_CLIENT_SECRET?new OAuth2Client(GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI):null;}
+function safeEqual(a,b){if(typeof a!=="string"||typeof b!=="string")return false;const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&crypto.timingSafeEqual(x,y);}
+function clearGoogle(res){const s=process.env.NODE_ENV==="production"?"; Secure":"";["stnd_state","stnd_nonce"].forEach(n=>res.append("Set-Cookie",n+"=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"+s));}
+function encryptPay(value){const c=crypto.createCipheriv("aes-256-cbc",Buffer.from(PAY_ENCRYPTION),Buffer.from(PAY_ENCRYPTION.slice(0,16)));return Buffer.concat([c.update(JSON.stringify(value),"utf8"),c.final()]).toString("base64");}
+function decryptPay(value){const d=crypto.createDecipheriv("aes-256-cbc",Buffer.from(PAY_ENCRYPTION),Buffer.from(PAY_ENCRYPTION.slice(0,16)));return JSON.parse(Buffer.concat([d.update(Buffer.from(value,"base64")),d.final()]).toString("utf8"));}
+async function payRequest(url,options={}){const r=await fetch(url,{...options,headers:{authorization:PAY_KEY,"content-type":"application/json",...(options.headers||{})}});const body=await r.json().catch(()=>({}));if(!r.ok)throw Error(body.message||body.error||"Pesepay request failed.");return body;}
+async function startPayment(orderId,total){
+  const payload=encryptPay({amountDetails:{amount:Number(total.toFixed(2)),currencyCode:"USD"},reasonForPayment:"STND. order #"+orderId,merchantReference:"STND-"+orderId,resultUrl:APP_URL+"/payments/pesepay/result",returnUrl:APP_URL+"/payment/return?order="+orderId});
+  const body=await payRequest(PAY_URL+"/payments/initiate",{method:"POST",body:JSON.stringify({payload})});
+  if(!body.payload)throw Error("Pesepay response missing payload.");
+  const data=decryptPay(body.payload);
+  if(!data.referenceNumber||!data.redirectUrl)throw Error("Pesepay checkout response incomplete.");
+  await pool.query("update public.orders set payment_reference=$1,payment_provider='pesepay',status='pending_payment',payment_status='pending',updated_at=now() where id=$2",[data.referenceNumber,orderId]);
+  return data;
+}
+async function checkPayment(ref){
+  const u=new URL(PAY_URL+"/payments/check-payment");u.searchParams.set("referenceNumber",ref);
+  const body=await payRequest(u.toString());if(!body.payload)throw Error("Payment status response incomplete.");return decryptPay(body.payload);
+}
+async function settlePayment(data){
+  const c=await pool.connect();
   try{
-    const {tokens}=await client.getToken(req.query.code);
-    if(!tokens.id_token)throw Error("Google did not return an ID token.");
-    const ticket=await client.verifyIdToken({idToken:tokens.id_token,audience:GOOGLE_CLIENT_ID});
-    const profile=ticket.getPayload();
-    if(!profile || !profile.sub || !profile.email || profile.email_verified!==true || !safeEqual(String(profile.nonce||""),nonceCookie)) throw Error("Google account verification failed.");
-    let user=db.prepare("SELECT id,name,email,role,created_at,google_sub FROM users WHERE google_sub=?").get(profile.sub);
-    if(!user){
-      user=db.prepare("SELECT id,name,email,role,created_at,google_sub FROM users WHERE email=? COLLATE NOCASE").get(profile.email);
-      if(user){
-        if(user.google_sub && user.google_sub!==profile.sub)throw Error("That email is already linked to another Google account.");
-        db.prepare("UPDATE users SET google_sub=? WHERE id=?").run(profile.sub,user.id);
-        user=db.prepare("SELECT id,name,email,role,created_at,google_sub FROM users WHERE id=?").get(user.id);
-      }else{
-        const result=db.prepare("INSERT INTO users(name,email,password_hash,google_sub,role) VALUES(?,?,?,?,?)").run(String(profile.name||profile.email).slice(0,100),profile.email.toLowerCase(),"google:"+crypto.randomBytes(32).toString("hex"),profile.sub,roleCookie==="seller"?"seller":"buyer");
-        user=db.prepare("SELECT id,name,email,role,created_at,google_sub FROM users WHERE id=?").get(result.lastInsertRowid);
-      }
+    await c.query("begin");
+    const found=await c.query("select * from public.orders where payment_reference=$1 for update",[data.referenceNumber]);
+    const o=found.rows[0];if(!o){await c.query("commit");return {ignored:true};}
+    if(o.payment_status==="paid"){await c.query("commit");return {alreadyPaid:true};}
+    const amount=Number(data.amountDetails?.amount),currency=String(data.amountDetails?.currencyCode||"").toUpperCase();
+    if(currency!=="USD"||!Number.isFinite(amount)||Math.abs(amount-Number(o.total))>.009)throw Error("Payment amount/currency mismatch.");
+    if(data.transactionStatus==="SUCCESS"){await c.query("update public.orders set status='paid',payment_status='paid',updated_at=now() where id=$1",[o.id]);}
+    else if(["FAILED","CANCELLED","REVERSED","EXPIRED"].includes(String(data.transactionStatus||"").toUpperCase())){
+      const changed=await c.query("update public.orders set status='payment_failed',payment_status='failed',updated_at=now() where id=$1 and payment_status='pending' returning id",[o.id]);
+      if(changed.rowCount){const items=await c.query("select product_id,quantity from public.order_items where order_id=$1",[o.id]);for(const i of items.rows)await c.query("update public.products set stock=stock+$1,updated_at=now() where id=$2",[i.quantity,i.product_id]);}
     }
-    const token=crypto.randomBytes(32).toString("base64url");
-    db.prepare("INSERT INTO sessions(user_id,token_hash,expires_at) VALUES(?,?,?)").run(user.id,hashToken(token),Date.now()+SESSION_DAYS*86400000);
-    res.append("Set-Cookie","qc_session="+encodeURIComponent(token)+"; "+cookieOptions(SESSION_DAYS*86400));
-    res.redirect("/?google=success");
-  }catch(error){
-    console.error("Google sign-in failed:",error.message);
-    res.redirect("/?google=failed#account");
-  }
-});
+    await c.query("commit");return {status:data.transactionStatus||"PENDING",orderId:Number(o.id)};
+  }catch(e){await c.query("rollback");throw e;}finally{c.release();}
+}
+async function restoreOrder(orderId){
+  const c=await pool.connect();
+  try{await c.query("begin");const changed=await c.query("update public.orders set status='payment_failed',payment_status='failed',updated_at=now() where id=$1 and payment_status='pending' returning id",[orderId]);if(changed.rowCount){const rows=await c.query("select product_id,quantity from public.order_items where order_id=$1",[orderId]);for(const i of rows.rows)await c.query("update public.products set stock=stock+$1,updated_at=now() where id=$2",[i.quantity,i.product_id]);}await c.query("commit");}
+  catch(e){await c.query("rollback");console.error("[orders] stock restore failed:",e.code||"unknown");}finally{c.release();}
+}
 
-app.post("/api/auth/logout",(req,res)=>{
-  const token=readCookie(req,"qc_session"); if(token)db.prepare("DELETE FROM sessions WHERE token_hash=?").run(hashToken(token));
-  res.setHeader("Set-Cookie","qc_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");res.json({message:"Signed out."});
+app.get("/api/health",asyncRoute(async(req,res)=>{await pool.query("select 1");res.json({status:"ok",database:"supabase-postgresql",payments:payReady()?"configured":"manual-order-mode"});}));
+app.post("/api/auth/register",asyncRoute(async(req,res)=>{
+  const {name,email,password}=req.body||{},mail=String(email||"").trim().toLowerCase();
+  if(!validText(name,100)||!validEmail(mail)||typeof password!=="string"||password.length<8||password.length>200)return res.status(400).json({error:"Enter your name, a valid email and a password of at least 8 characters."});
+  if(ADMIN_EMAIL&&mail===ADMIN_EMAIL)return res.status(403).json({error:"The store administrator must use verified Google sign-in."});
+  const c=await pool.connect();try{await c.query("begin");const r=await c.query("insert into public.users(name,email,password_hash,role) values($1,$2,$3,'customer') returning id,name,email,role,created_at",[name.trim(),mail,passwordHash(password)]);const token=await createSession(c,r.rows[0].id);await c.query("commit");setCookie(res,token);res.status(201).json({user:cleanUser(r.rows[0]),message:"Your STND. account is ready."});}
+  catch(e){await c.query("rollback");if(e.code==="23505")return res.status(409).json({error:"An account with that email already exists. Sign in instead."});throw e;}finally{c.release();}
+}));
+app.post("/api/auth/login",asyncRoute(async(req,res)=>{
+  const {email,password}=req.body||{};if(!validEmail(email)||typeof password!=="string")return res.status(400).json({error:"Enter your email and password."});
+  const r=await pool.query("select u.*,c.address,c.phone from public.users u left join public.customers c on lower(c.email)=lower(u.email) where lower(u.email)=lower($1) limit 1",[email.trim()]);
+  const u=r.rows[0];if(!u||!passwordMatches(password,u.password_hash))return res.status(401).json({error:"Email or password is incorrect."});
+  setCookie(res,await createSession(pool,u.id));res.json({user:cleanUser(u),message:"Signed in successfully."});
+}));
+app.get("/auth/google",(req,res)=>{
+  const client=googleClient();if(!client)return res.redirect("/?google=setup#account");
+  const state=crypto.randomBytes(32).toString("base64url"),nonce=crypto.randomBytes(32).toString("base64url"),secure=process.env.NODE_ENV==="production"?"; Secure":"";
+  res.append("Set-Cookie","stnd_state="+state+"; Path=/; HttpOnly; SameSite=Lax; Max-Age=600"+secure);
+  res.append("Set-Cookie","stnd_nonce="+nonce+"; Path=/; HttpOnly; SameSite=Lax; Max-Age=600"+secure);
+  res.redirect(client.generateAuthUrl({access_type:"online",prompt:"select_account",scope:["openid","email","profile"],state,nonce}));
 });
+app.get("/auth/google/callback",asyncRoute(async(req,res)=>{
+  const client=googleClient(),state=readCookie(req,"stnd_state"),nonce=readCookie(req,"stnd_nonce"),valid=safeEqual(String(req.query.state||""),state);clearGoogle(res);
+  if(!client||!valid||!nonce||typeof req.query.code!=="string"||req.query.error)return res.redirect("/?google=failed#account");
+  const {tokens}=await client.getToken(req.query.code);if(!tokens.id_token)throw Error("Google ID token missing.");
+  const ticket=await client.verifyIdToken({idToken:tokens.id_token,audience:GOOGLE_CLIENT_ID}),profile=ticket.getPayload();
+  if(!profile?.sub||!profile.email||profile.email_verified!==true||!safeEqual(String(profile.nonce||""),nonce))throw Error("Google verification failed.");
+  const mail=profile.email.toLowerCase(),isAdmin=Boolean(ADMIN_EMAIL&&mail===ADMIN_EMAIL),c=await pool.connect();
+  try{await c.query("begin");let q=await c.query("select * from public.users where google_sub=$1 or lower(email)=lower($2) limit 1 for update",[profile.sub,mail]);let u=q.rows[0];
+    if(u){if(u.google_sub&&u.google_sub!==profile.sub)throw Error("Google account conflict.");q=await c.query("update public.users set google_sub=$1,role=case when $2 then 'admin' else role end,updated_at=now() where id=$3 returning id,name,email,role,created_at",[profile.sub,isAdmin,u.id]);u=q.rows[0];}
+    else{q=await c.query("insert into public.users(name,email,google_sub,role) values($1,$2,$3,$4) returning id,name,email,role,created_at",[String(profile.name||mail).slice(0,100),mail,profile.sub,isAdmin?"admin":"customer"]);u=q.rows[0];}
+    const token=await createSession(c,u.id);await c.query("commit");setCookie(res,token);res.redirect("/?google=success");
+  }catch(e){await c.query("rollback");throw e;}finally{c.release();}
+}));
+app.post("/api/auth/logout",asyncRoute(async(req,res)=>{const token=readCookie(req,COOKIE);if(token)await pool.query("delete from public.sessions where token_hash=$1",[hash(token)]);clearCookie(res);res.json({message:"Signed out."});}));
 app.get("/api/auth/me",auth,(req,res)=>res.json({user:cleanUser(req.user)}));
 
-app.get("/api/products",(req,res)=>{
-  const rows=db.prepare("SELECT p.id,p.name,p.description,p.price,p.image,p.seller_id,p.stock,p.category,p.active,u.name AS seller_name FROM products p LEFT JOIN users u ON u.id=p.seller_id WHERE p.active=1 AND p.stock>0 ORDER BY p.id DESC").all();
-  res.json(rows.map(publicProduct));
-});
-app.get("/api/seller/products",auth,requireRole("seller"),(req,res)=>{
-  const rows=db.prepare("SELECT * FROM products WHERE seller_id=? ORDER BY created_at DESC,id DESC").all(req.user.id);
-  res.json(rows.map(publicProduct));
-});
-app.post("/api/seller/products",auth,requireRole("seller"),(req,res)=>{
-  const {name,description,price,image,stock=0,category="Everyday"}=req.body||{};
-  const p=Number(price),q=Number(stock);
-  if(!validText(name,120)||!validText(description,2000)||!Number.isFinite(p)||p<0||p>100000000||!validText(image,2000)||!Number.isInteger(q)||q<0||q>1000000||!validText(category,60))
-    return res.status(400).json({error:"Check the product name, description, image URL, price, category and stock quantity."});
-  const result=db.prepare("INSERT INTO products(name,description,price,image,seller_id,stock,category) VALUES(?,?,?,?,?,?,?)").run(name.trim(),description.trim(),p,image.trim(),req.user.id,q,category.trim());
-  res.status(201).json({product:publicProduct(db.prepare("SELECT * FROM products WHERE id=?").get(result.lastInsertRowid)),message:"Product listed."});
-});
-app.patch("/api/seller/products/:id",auth,requireRole("seller"),(req,res)=>{
-  const id=Number(req.params.id),existing=db.prepare("SELECT * FROM products WHERE id=? AND seller_id=?").get(id,req.user.id);
-  if(!existing)return res.status(404).json({error:"Product not found in your shop."});
-  const allowed=["name","description","price","image","stock","category"];
-  const patch=req.body||{};if(!Object.keys(patch).length||Object.keys(patch).some(k=>!allowed.includes(k)))return res.status(400).json({error:"Only name, description, price, image, stock and category can be updated."});
-  const next={...existing,...patch};
-  if(!validText(next.name,120)||!validText(next.description,2000)||!Number.isFinite(Number(next.price))||Number(next.price)<0||!validText(next.image,2000)||!Number.isInteger(Number(next.stock))||Number(next.stock)<0||!validText(next.category,60))return res.status(400).json({error:"Invalid product details or stock quantity."});
-  db.prepare("UPDATE products SET name=?,description=?,price=?,image=?,stock=?,category=? WHERE id=? AND seller_id=?").run(next.name.trim(),next.description.trim(),Number(next.price),next.image.trim(),Number(next.stock),next.category.trim(),id,req.user.id);
-  res.json({product:publicProduct(db.prepare("SELECT * FROM products WHERE id=?").get(id)),message:"Product updated."});
-});
-app.delete("/api/seller/products/:id",auth,requireRole("seller"),(req,res)=>{
-  const result=db.prepare("UPDATE products SET active=0 WHERE id=? AND seller_id=? AND active=1").run(Number(req.params.id),req.user.id);
-  if(!result.changes)return res.status(404).json({error:"Product not found in your shop."});
-  res.json({message:"Product removed from your storefront."});
-});
-app.get("/api/seller/orders",auth,requireRole("seller"),(req,res)=>{
-  const rows=db.prepare(`SELECT o.id,o.status,o.total,o.created_at,c.name AS customer_name,c.email AS customer_email,
-    oi.product_id,oi.quantity,oi.unit_price,p.name AS product_name
-    FROM orders o JOIN customers c ON c.id=o.customer_id
-    JOIN order_items oi ON oi.order_id=o.id JOIN products p ON p.id=oi.product_id
-    WHERE p.seller_id=? AND o.status='paid' ORDER BY o.created_at DESC,o.id DESC`).all(req.user.id);
-  res.json(rows.map(r=>({...r,total:Number(r.total),unit_price:Number(r.unit_price)})));
-});
+app.get("/api/products",asyncRoute(async(req,res)=>{const r=await pool.query("select id,name,description,price,image,slug,sku,category,audience,stock,status,featured,created_at from public.products where status='active' and stock>0 order by featured desc,created_at desc,id desc");res.json(r.rows.map(cleanProduct));}));
+const listProducts=async()=>{const r=await pool.query("select id,name,description,price,image,slug,sku,category,audience,stock,status,featured,created_at from public.products order by created_at desc,id desc");return r.rows.map(cleanProduct);};
+app.get(["/api/admin/products","/api/seller/products"],auth,adminOnly,asyncRoute(async(req,res)=>res.json(await listProducts())));
+app.post(["/api/admin/products","/api/seller/products"],auth,adminOnly,asyncRoute(async(req,res)=>{
+  const {name,description,price,image,stock=0,category="Essentials",audience="Unisex",sku=null}=req.body||{},p=Number(price),q=Number(stock);
+  if(!validText(name,120)||!validText(description,2000)||!Number.isFinite(p)||p<0||!validText(image,2000)||!Number.isInteger(q)||q<0||!validText(category,60)||!["Men","Women","Unisex"].includes(audience))return res.status(400).json({error:"Check product details, price, category, audience and stock."});
+  const slug=name.toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")+"-"+crypto.randomBytes(3).toString("hex");
+  const r=await pool.query("insert into public.products(name,description,price,image,slug,sku,category,audience,stock,status,featured) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',false) returning *",[name.trim(),description.trim(),p,image.trim(),slug,sku,category.trim(),audience,q]);
+  res.status(201).json({product:cleanProduct(r.rows[0]),message:"Product added to STND."});
+}));
+app.patch(["/api/admin/products/:id","/api/seller/products/:id"],auth,adminOnly,asyncRoute(async(req,res)=>{
+  const id=Number(req.params.id),patch=req.body||{},allowed=["name","description","price","image","stock","category","audience","featured","status","sku"];
+  if(!Number.isSafeInteger(id)||!Object.keys(patch).length||Object.keys(patch).some(k=>!allowed.includes(k)))return res.status(400).json({error:"Invalid product update."});
+  const found=await pool.query("select * from public.products where id=$1",[id]);if(!found.rowCount)return res.status(404).json({error:"Product not found."});
+  const n={...found.rows[0],...patch};if(!validText(n.name,120)||!validText(n.description,2000)||!Number.isFinite(Number(n.price))||Number(n.price)<0||!validText(n.image,2000)||!Number.isInteger(Number(n.stock))||Number(n.stock)<0||!validText(n.category,60)||!["Men","Women","Unisex"].includes(n.audience)||!["draft","active","archived"].includes(n.status))return res.status(400).json({error:"Invalid product details."});
+  const r=await pool.query("update public.products set name=$1,description=$2,price=$3,image=$4,stock=$5,category=$6,audience=$7,featured=$8,status=$9,sku=$10,updated_at=now() where id=$11 returning *",[n.name.trim(),n.description.trim(),Number(n.price),n.image.trim(),Number(n.stock),n.category.trim(),n.audience,Boolean(n.featured),n.status,n.sku||null,id]);res.json({product:cleanProduct(r.rows[0]),message:"Product updated."});
+}));
+app.delete(["/api/admin/products/:id","/api/seller/products/:id"],auth,adminOnly,asyncRoute(async(req,res)=>{const r=await pool.query("update public.products set status='archived',stock=0,updated_at=now() where id=$1 and status<>'archived' returning id",[Number(req.params.id)]);if(!r.rowCount)return res.status(404).json({error:"Product not found."});res.json({message:"Product archived."});}));
+app.get(["/api/admin/orders","/api/seller/orders"],auth,adminOnly,asyncRoute(async(req,res)=>{const r=await pool.query("select o.id,o.status,o.payment_status,o.total,o.created_at,c.name customer_name,c.email customer_email,oi.product_id,oi.quantity,oi.unit_price,coalesce(oi.product_name,p.name) product_name from public.orders o join public.customers c on c.id=o.customer_id join public.order_items oi on oi.order_id=o.id left join public.products p on p.id=oi.product_id order by o.created_at desc,o.id desc");res.json(r.rows.map(x=>({...x,id:Number(x.id),product_id:Number(x.product_id),quantity:Number(x.quantity),total:Number(x.total),unit_price:Number(x.unit_price)})));}));
 
-app.post("/api/checkout",async(req,res)=>{
-  const {customer,items}=req.body||{};
-  if(!customer?.name||!emailOk(customer.email)||!customer?.address||!Array.isArray(items)||!items.length)return res.status(400).json({error:"Complete your details and add items to your cart."});
-  if(!pesepayReady())return res.status(503).json({error:"Secure checkout is not configured yet. Please try again shortly."});
-  const token=readCookie(req,"qc_session");
-  const user=token?db.prepare("SELECT u.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?").get(hashToken(token),Date.now()):null;
-  let orderId=null,total=0;
+app.post("/api/checkout",asyncRoute(async(req,res)=>{
+  const {customer={},items,accountMode="guest",password}=req.body||{},name=String(customer.name||"").trim(),email=String(customer.email||"").trim().toLowerCase(),phone=String(customer.phone||"").trim(),address=String(customer.address||"").trim();
+  if(!validText(name,100)||!validEmail(email)||!validText(address,500)||!Array.isArray(items)||!items.length||items.length>50)return res.status(400).json({error:"Enter your name, email, delivery address and add items to your bag."});
+  if(!["guest","signup","login"].includes(accountMode))return res.status(400).json({error:"Choose guest checkout, sign up or sign in."});
+  if(accountMode!=="guest"&&(typeof password!=="string"||password.length<8||password.length>200))return res.status(400).json({error:"Enter your password (at least 8 characters)."});
+  const c=await pool.connect();let orderId=null,sessionToken=null,guestToken=null,total=0;
   try{
-    db.exec("BEGIN IMMEDIATE");
-    const rows=items.map(i=>{
-      const id=Number(i.id),q=Number(i.quantity);
-      if(!Number.isInteger(id)||!Number.isInteger(q)||q<1||q>99)throw Error("Invalid cart item.");
-      const p=db.prepare("SELECT * FROM products WHERE id=? AND active=1").get(id);
-      if(!p)throw Error("A product in your cart is no longer available.");
-      if(p.stock<q)throw Error("Not enough stock for "+p.name+". Available: "+p.stock+".");
-      total+=p.price*q;return {p,q};
-    });
-    const email=customer.email.trim().toLowerCase();
-    db.prepare("INSERT INTO customers(name,email,address) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,address=excluded.address").run(customer.name.trim(),email,customer.address.trim());
-    const c=db.prepare("SELECT id FROM customers WHERE email=?").get(email);
-    const o=db.prepare("INSERT INTO orders(customer_id,user_id,total,status) VALUES(?,?,?,'pending_payment')").run(c.id,user?.id||null,total);
-    orderId=Number(o.lastInsertRowid);
-    const ins=db.prepare("INSERT INTO order_items(order_id,product_id,quantity,unit_price) VALUES(?,?,?,?)");
-    const dec=db.prepare("UPDATE products SET stock=stock-? WHERE id=? AND stock>=?");
-    rows.forEach(x=>{ins.run(orderId,x.p.id,x.q,x.p.price);const changed=dec.run(x.q,x.p.id,x.q);if(!changed.changes)throw Error("Stock changed while checking out. Please try again.");});
-    db.exec("COMMIT");
-    const payment=await initiatePesepayPayment(orderId,total);
-    res.status(201).json({message:"Redirecting to secure payment.",orderId,total,checkoutUrl:payment.redirectUrl});
-  }catch(e){
-    try{db.exec("ROLLBACK")}catch{}
-    if(orderId){
-      try{
-        db.exec("BEGIN IMMEDIATE");
-        const changed=db.prepare("UPDATE orders SET status='payment_failed' WHERE id=? AND status='pending_payment' AND payment_reference IS NULL").run(orderId);
-        if(changed.changes){
-          const restoreRows=db.prepare("SELECT product_id,quantity FROM order_items WHERE order_id=?").all(orderId);
-          const restore=db.prepare("UPDATE products SET stock=stock+? WHERE id=?");
-          restoreRows.forEach(item=>restore.run(item.quantity,item.product_id));
-        }
-        db.exec("COMMIT");
-      }catch{try{db.exec("ROLLBACK")}catch{}}
-    }
-    console.error("Checkout/payment initiation failed:",e.message);
-    res.status(502).json({error:"We couldn't start your payment. Your order has not been confirmed. Please try again."});
-  }
-});
-app.post("/payments/pesepay/result",async(req,res)=>{
-  if(!PESEPAY_INTEGRATION_KEY||req.get("authorization")!==PESEPAY_INTEGRATION_KEY)return res.sendStatus(401);
-  const referenceNumber=req.body?.referenceNumber;
-  if(typeof referenceNumber!=="string"||!referenceNumber)return res.sendStatus(400);
-  res.sendStatus(200);
-  try{
-    const order=db.prepare("SELECT id,status FROM orders WHERE payment_reference=?").get(referenceNumber);
-    if(!order||order.status==="paid")return;
-    const result=await confirmPesepayPayment(referenceNumber);
-    settlePesepayResult(result);
-  }catch(e){console.error("Pesepay callback verification failed:",e.message);}
-});
-app.get("/api/payments/status",async(req,res)=>{
-  const orderId=Number(req.query.orderId);
-  const referenceNumber=String(req.query.referenceNumber||"");
-  if(!referenceNumber&&!Number.isInteger(orderId))return res.status(400).json({error:"Missing order reference."});
-  const order=referenceNumber
-    ? db.prepare("SELECT id,total,status,payment_reference FROM orders WHERE payment_reference=?").get(referenceNumber)
-    : db.prepare("SELECT id,total,status,payment_reference FROM orders WHERE id=?").get(orderId);
-  if(!order)return res.status(404).json({error:"Payment reference not found."});
-  if(order.status==="paid")return res.json({orderId:order.id,status:"paid",total:Number(order.total)});
-  if(!order.payment_reference)return res.json({orderId:order.id,status:order.status,total:Number(order.total)});
-  try{
-    const result=await confirmPesepayPayment(order.payment_reference);
-    settlePesepayResult(result);
-    const current=db.prepare("SELECT status,total FROM orders WHERE id=?").get(order.id);
-    return res.json({orderId:order.id,status:current.status,total:Number(current.total),providerStatus:result.transactionStatus||"PENDING"});
-  }catch(e){console.error("Payment status check failed:",e.message);return res.status(502).json({error:"Payment status is temporarily unavailable."});}
-});
+    await c.query("begin");let user=readCookie(req,COOKIE)?await getSession(readCookie(req,COOKIE),c):null;
+    if(accountMode==="signup"){if(ADMIN_EMAIL&&email===ADMIN_EMAIL)throw Object.assign(Error("The store administrator must use verified Google sign-in."),{status:403});if(user)throw Object.assign(Error("You are already signed in."),{status:400});const r=await c.query("insert into public.users(name,email,password_hash,role) values($1,$2,$3,'customer') returning id,name,email,role,created_at",[name,email,passwordHash(password)]);user=r.rows[0];sessionToken=await createSession(c,user.id);}
+    if(accountMode==="login"){const r=await c.query("select id,name,email,password_hash,role,created_at from public.users where lower(email)=lower($1) limit 1 for update",[email]);const u=r.rows[0];if(!u||!passwordMatches(password,u.password_hash))throw Object.assign(Error("Email or password is incorrect."),{status:401});user=u;sessionToken=await createSession(c,u.id);}
+    if(user&&String(user.email).toLowerCase()!==email)throw Object.assign(Error("Use the email address linked to your account."),{status:400});
+    const quantities=new Map();for(const item of items){const id=Number(item.id),q=Number(item.quantity);if(!Number.isSafeInteger(id)||!Number.isInteger(q)||q<1||q>99)throw Object.assign(Error("Invalid item in your bag."),{status:400});quantities.set(id,(quantities.get(id)||0)+q);}
+    const verified=[];for(const [id,q] of quantities){const r=await c.query("select id,name,price,stock,status from public.products where id=$1 for update",[id]);const p=r.rows[0];if(!p||p.status!=="active")throw Object.assign(Error("A product in your bag is no longer available."),{status:409});if(Number(p.stock)<q)throw Object.assign(Error("Not enough stock for "+p.name+". Available: "+p.stock+"."),{status:409});total+=Number(p.price)*q;verified.push({p,q});}
+    const customerRow=await c.query("insert into public.customers(name,email,address,phone) values($1,$2,$3,$4) on conflict(email) do update set name=excluded.name,address=excluded.address,phone=excluded.phone returning id",[name,email,address,phone||null]);
+    guestToken=user?null:crypto.randomBytes(32).toString("base64url");
+    const order=await c.query("insert into public.orders(customer_id,user_id,total,status,payment_status,shipping_name,shipping_email,shipping_phone,shipping_address,guest_token_hash) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id",[customerRow.rows[0].id,user?user.id:null,total,payReady()?"pending_payment":"placed",payReady()?"pending":"unpaid",name,email,phone||null,address,guestToken?hash(guestToken):null]);orderId=Number(order.rows[0].id);
+    for(const x of verified){await c.query("insert into public.order_items(order_id,product_id,quantity,unit_price,product_name) values($1,$2,$3,$4,$5)",[orderId,x.p.id,x.q,x.p.price,x.p.name]);const dec=await c.query("update public.products set stock=stock-$1,updated_at=now() where id=$2 and stock >= $1",[x.q,x.p.id]);if(!dec.rowCount)throw Object.assign(Error("Stock changed while checking out. Please review your bag."),{status:409});}
+    await c.query("commit");if(sessionToken)setCookie(res,sessionToken);
+    if(payReady()){try{const p=await startPayment(orderId,total);return res.status(201).json({message:"Continue to secure payment.",orderId,total,checkoutUrl:p.redirectUrl,accountCreated:accountMode==="signup"});}catch(e){await restoreOrder(orderId);throw Object.assign(Error("We couldn't start payment. No payment was taken and reserved stock has been released."),{status:502});}}
+    return res.status(201).json({message:"Your order has been received. Payment is pending confirmation by STND.",orderId,total,checkoutUrl:null,orderStatus:"placed",guestAccessToken:guestToken,accountCreated:accountMode==="signup"});
+  }catch(e){try{await c.query("rollback");}catch{}if(e.code==="23505")return res.status(409).json({error:"An account with that email already exists. Choose sign in instead."});if(e.status)return res.status(e.status).json({error:e.message});throw e;}finally{c.release();}
+}));
+
+app.post("/payments/pesepay/result",asyncRoute(async(req,res)=>{if(!PAY_KEY||req.get("authorization")!==PAY_KEY)return res.sendStatus(401);const ref=req.body?.referenceNumber;if(typeof ref!=="string"||!ref)return res.sendStatus(400);res.sendStatus(200);try{const r=await pool.query("select payment_status from public.orders where payment_reference=$1",[ref]);if(r.rows[0]?.payment_status!=="paid")await settlePayment(await checkPayment(ref));}catch(e){console.error("[payments] callback verification failed:",e.code||e.message);}}));
+app.get("/api/payments/status",asyncRoute(async(req,res)=>{const id=Number(req.query.orderId);if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({error:"Missing order reference."});let r=await pool.query("select id,total,status,payment_status,payment_reference from public.orders where id=$1",[id]);const o=r.rows[0];if(!o)return res.status(404).json({error:"Order not found."});if(o.payment_status!=="paid"&&o.payment_reference){await settlePayment(await checkPayment(o.payment_reference));r=await pool.query("select status,payment_status,total from public.orders where id=$1",[id]);}res.json({orderId:id,status:r.rows[0].status,paymentStatus:r.rows[0].payment_status,total:Number(r.rows[0].total)});}));
 app.get("/payment/return",(req,res)=>res.redirect("/?payment=return&order="+encodeURIComponent(String(req.query.order||""))));
-app.get("/api/orders",auth,(req,res)=>{
-  const rows=db.prepare("SELECT id,total,status,created_at FROM orders WHERE user_id=? ORDER BY created_at DESC,id DESC").all(req.user.id);
-  res.json(rows.map(r=>({...r,total:Number(r.total)})));
-});
+app.get("/api/orders",auth,asyncRoute(async(req,res)=>{const r=await pool.query("select id,total,status,payment_status,created_at from public.orders where user_id=$1 order by created_at desc,id desc",[req.user.id]);res.json(r.rows.map(x=>({...x,id:Number(x.id),total:Number(x.total)})));}));
+app.get("/api/orders/guest/:id",asyncRoute(async(req,res)=>{const token=String(req.query.token||"");if(!token)return res.status(400).json({error:"Guest order token required."});const r=await pool.query("select id,total,status,payment_status,created_at,shipping_name,shipping_email from public.orders where id=$1 and guest_token_hash=$2",[Number(req.params.id),hash(token)]);if(!r.rowCount)return res.status(404).json({error:"Order not found."});res.json({...r.rows[0],id:Number(r.rows[0].id),total:Number(r.rows[0].total)});}));
+
 app.use("/api/*",(req,res)=>res.status(404).json({error:"API route not found."}));
 app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
-app.use((err,req,res,next)=>{console.error(err);res.status(500).json({error:"Something went wrong. Please try again."});});
-const cleanup=setInterval(()=>db.prepare("DELETE FROM sessions WHERE expires_at<=?").run(Date.now()),3600000);
-cleanup.unref();
-app.listen(PORT,"0.0.0.0",()=>{
-  console.log("QuickCart API and storefront listening on "+PORT);
-  if(process.env.DB_CONNECTION_TEST==="1"){
-    require("./db-check").run().catch(()=>{});
-  }
-});
+app.use((err,req,res,next)=>{console.error("[api] request failed:",err.code||err.message);if(res.headersSent)return next(err);res.status(500).json({error:"Something went wrong. Please try again."});});
+const cleanup=setInterval(()=>pool.query("delete from public.sessions where expires_at <= $1",[Date.now()]).catch(e=>console.error("[sessions] cleanup failed:",e.code||"unknown")),3600000);cleanup.unref();
+async function start(){await pool.query("select 1");app.listen(PORT,"0.0.0.0",()=>console.log("STND. PostgreSQL storefront listening on "+PORT));}
+start().catch(e=>{console.error("[startup] PostgreSQL connection failed:",e.code||e.message);process.exit(1);});
