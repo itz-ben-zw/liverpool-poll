@@ -405,13 +405,17 @@ app.post("/payments/pesepay/result",async(req,res)=>{
   }catch(e){console.error("Pesepay callback verification failed:",e.message);}
 });
 app.get("/api/payments/status",async(req,res)=>{
+  const orderId=Number(req.query.orderId);
   const referenceNumber=String(req.query.referenceNumber||"");
-  if(!referenceNumber)return res.status(400).json({error:"Missing payment reference."});
-  const order=db.prepare("SELECT id,total,status FROM orders WHERE payment_reference=?").get(referenceNumber);
+  if(!referenceNumber&&!Number.isInteger(orderId))return res.status(400).json({error:"Missing order reference."});
+  const order=referenceNumber
+    ? db.prepare("SELECT id,total,status,payment_reference FROM orders WHERE payment_reference=?").get(referenceNumber)
+    : db.prepare("SELECT id,total,status,payment_reference FROM orders WHERE id=?").get(orderId);
   if(!order)return res.status(404).json({error:"Payment reference not found."});
   if(order.status==="paid")return res.json({orderId:order.id,status:"paid",total:Number(order.total)});
+  if(!order.payment_reference)return res.json({orderId:order.id,status:order.status,total:Number(order.total)});
   try{
-    const result=await confirmPesepayPayment(referenceNumber);
+    const result=await confirmPesepayPayment(order.payment_reference);
     settlePesepayResult(result);
     const current=db.prepare("SELECT status,total FROM orders WHERE id=?").get(order.id);
     return res.json({orderId:order.id,status:current.status,total:Number(current.total),providerStatus:result.transactionStatus||"PENDING"});
