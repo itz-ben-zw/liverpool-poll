@@ -346,13 +346,15 @@ app.get("/api/seller/orders",auth,requireRole("seller"),(req,res)=>{
   res.json(rows.map(r=>({...r,total:Number(r.total),unit_price:Number(r.unit_price)})));
 });
 
-app.post("/api/checkout",(req,res)=>{
+app.post("/api/checkout",async(req,res)=>{
   const {customer,items}=req.body||{};
   if(!customer?.name||!emailOk(customer.email)||!customer?.address||!Array.isArray(items)||!items.length)return res.status(400).json({error:"Complete your details and add items to your cart."});
+  if(!pesepayReady())return res.status(503).json({error:"Secure checkout is not configured yet. Please try again shortly."});
   const token=readCookie(req,"qc_session");
   const user=token?db.prepare("SELECT u.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?").get(hashToken(token),Date.now()):null;
+  let orderId=null,total=0;
   try{
-    db.exec("BEGIN IMMEDIATE");let total=0;
+    db.exec("BEGIN IMMEDIATE");
     const rows=items.map(i=>{
       const id=Number(i.id),q=Number(i.quantity);
       if(!Number.isInteger(id)||!Number.isInteger(q)||q<1||q>99)throw Error("Invalid cart item.");
@@ -364,13 +366,58 @@ app.post("/api/checkout",(req,res)=>{
     const email=customer.email.trim().toLowerCase();
     db.prepare("INSERT INTO customers(name,email,address) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,address=excluded.address").run(customer.name.trim(),email,customer.address.trim());
     const c=db.prepare("SELECT id FROM customers WHERE email=?").get(email);
-    const o=db.prepare("INSERT INTO orders(customer_id,user_id,total) VALUES(?,?,?)").run(c.id,user?.id||null,total);
+    const o=db.prepare("INSERT INTO orders(customer_id,user_id,total,status) VALUES(?,?,?,'pending_payment')").run(c.id,user?.id||null,total);
+    orderId=Number(o.lastInsertRowid);
     const ins=db.prepare("INSERT INTO order_items(order_id,product_id,quantity,unit_price) VALUES(?,?,?,?)");
     const dec=db.prepare("UPDATE products SET stock=stock-? WHERE id=? AND stock>=?");
-    rows.forEach(x=>{ins.run(o.lastInsertRowid,x.p.id,x.q,x.p.price);const changed=dec.run(x.q,x.p.id,x.q);if(!changed.changes)throw Error("Stock changed while checking out. Please try again.");});
-    db.exec("COMMIT");res.status(201).json({message:"Order placed successfully!",orderId:Number(o.lastInsertRowid),total});
-  }catch(e){try{db.exec("ROLLBACK")}catch{}res.status(400).json({error:e.message});}
+    rows.forEach(x=>{ins.run(orderId,x.p.id,x.q,x.p.price);const changed=dec.run(x.q,x.p.id,x.q);if(!changed.changes)throw Error("Stock changed while checking out. Please try again.");});
+    db.exec("COMMIT");
+    const payment=await initiatePesepayPayment(orderId,total);
+    res.status(201).json({message:"Redirecting to secure payment.",orderId,total,checkoutUrl:payment.redirectUrl});
+  }catch(e){
+    try{db.exec("ROLLBACK")}catch{}
+    if(orderId){
+      try{
+        db.exec("BEGIN IMMEDIATE");
+        const changed=db.prepare("UPDATE orders SET status='payment_failed' WHERE id=? AND status='pending_payment' AND payment_reference IS NULL").run(orderId);
+        if(changed.changes){
+          const restoreRows=db.prepare("SELECT product_id,quantity FROM order_items WHERE order_id=?").all(orderId);
+          const restore=db.prepare("UPDATE products SET stock=stock+? WHERE id=?");
+          restoreRows.forEach(item=>restore.run(item.quantity,item.product_id));
+        }
+        db.exec("COMMIT");
+      }catch{try{db.exec("ROLLBACK")}catch{}}
+    }
+    console.error("Checkout/payment initiation failed:",e.message);
+    res.status(502).json({error:"We couldn't start your payment. Your order has not been confirmed. Please try again."});
+  }
 });
+app.post("/payments/pesepay/result",async(req,res)=>{
+  if(!PESEPAY_INTEGRATION_KEY||req.get("authorization")!==PESEPAY_INTEGRATION_KEY)return res.sendStatus(401);
+  const referenceNumber=req.body?.referenceNumber;
+  if(typeof referenceNumber!=="string"||!referenceNumber)return res.sendStatus(400);
+  res.sendStatus(200);
+  try{
+    const order=db.prepare("SELECT id,status FROM orders WHERE payment_reference=?").get(referenceNumber);
+    if(!order||order.status==="paid")return;
+    const result=await confirmPesepayPayment(referenceNumber);
+    settlePesepayResult(result);
+  }catch(e){console.error("Pesepay callback verification failed:",e.message);}
+});
+app.get("/api/payments/status",async(req,res)=>{
+  const referenceNumber=String(req.query.referenceNumber||"");
+  if(!referenceNumber)return res.status(400).json({error:"Missing payment reference."});
+  const order=db.prepare("SELECT id,total,status FROM orders WHERE payment_reference=?").get(referenceNumber);
+  if(!order)return res.status(404).json({error:"Payment reference not found."});
+  if(order.status==="paid")return res.json({orderId:order.id,status:"paid",total:Number(order.total)});
+  try{
+    const result=await confirmPesepayPayment(referenceNumber);
+    settlePesepayResult(result);
+    const current=db.prepare("SELECT status,total FROM orders WHERE id=?").get(order.id);
+    return res.json({orderId:order.id,status:current.status,total:Number(current.total),providerStatus:result.transactionStatus||"PENDING"});
+  }catch(e){console.error("Payment status check failed:",e.message);return res.status(502).json({error:"Payment status is temporarily unavailable."});}
+});
+app.get("/payment/return",(req,res)=>res.redirect("/?payment=return&order="+encodeURIComponent(String(req.query.order||""))));
 app.get("/api/orders",auth,(req,res)=>{
   const rows=db.prepare("SELECT id,total,status,created_at FROM orders WHERE user_id=? ORDER BY created_at DESC,id DESC").all(req.user.id);
   res.json(rows.map(r=>({...r,total:Number(r.total)})));
