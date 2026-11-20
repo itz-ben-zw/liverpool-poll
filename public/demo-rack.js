@@ -2,7 +2,7 @@
 "use strict";
 const $=id=>document.getElementById(id);
 const pieces=[
- {name:"Essential Tee",colour:"Black / Relaxed fit",price:"$28.00",description:"A clean everyday layer with a relaxed silhouette.",front:"https://images.pexels.com/photos/8532616/pexels-photo-8532616.jpeg?auto=compress&cs=tinysrgb&w=900",back:"https://images.pexels.com/photos/8532638/pexels-photo-8532638.jpeg?auto=compress&cs=tinysrgb&w=900",hasBack:true},
+ {name:"Essential Tee",colour:"Black / Relaxed fit",price:"$28.00",description:"A clean everyday layer with a relaxed silhouette.",front:"https://images.pexels.com/photos/8532616/pexels-photo-8532616.jpeg?auto=compress&cs=tinysrgb&w=900",back:null,hasBack:false},
  {name:"Core Hoodie",colour:"Chalk / Heavyweight",price:"$64.00",description:"A soft, understated layer with a considered everyday shape.",front:"https://images.pexels.com/photos/8217400/pexels-photo-8217400.jpeg?auto=compress&cs=tinysrgb&w=900",back:"https://images.pexels.com/photos/8217415/pexels-photo-8217415.jpeg?auto=compress&cs=tinysrgb&w=900",hasBack:true},
  {name:"Daily Tee",colour:"White / Regular fit",price:"$26.00",description:"A simple wardrobe staple, built around a straightforward fit.",front:"https://images.pexels.com/photos/11671964/pexels-photo-11671964.jpeg?auto=compress&cs=tinysrgb&w=900",back:null,hasBack:false}
 ];
