@@ -10,6 +10,9 @@ if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for STN
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined, max: 3, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000 });
 pool.on("error", e => console.error("[database] pool error:", e.code || "unknown"));
 const ADMIN_EMAIL = String(process.env.STND_ADMIN_EMAIL || "").trim().toLowerCase();
+const SUPABASE_URL = String(process.env.SUPABASE_URL || "https://llfywhxskldofuhtfjmv.supabase.co").replace(/\/$/, "");
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const PRODUCT_IMAGE_BUCKET = "stnd-product-images";
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || (process.env.NODE_ENV === "production" ? "https://stnd-store.onrender.com/auth/google/callback" : "http://localhost:3000/auth/google/callback");
@@ -30,7 +33,7 @@ const validText = (v, n=500) => typeof v === "string" && v.trim().length > 0 && 
 const validEmail = v => typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const hash = v => crypto.createHash("sha256").update(v).digest("hex");
 const cleanUser = u => u && ({ id:Number(u.id), name:u.name, email:u.email, role:u.role, createdAt:u.created_at, address:u.address || "", phone:u.phone || "" });
-const cleanProduct = p => ({ ...p, id:Number(p.id), price:Number(p.price), stock:Number(p.stock), featured:Boolean(p.featured), active:p.status === "active" });
+const cleanProduct = p => ({ ...p, images:Array.isArray(p.images)?p.images:(p.image?[p.image]:[]), id:Number(p.id), price:Number(p.price), stock:Number(p.stock), featured:Boolean(p.featured), active:p.status === "active" });
 const passwordHash = (p, salt=crypto.randomBytes(16).toString("hex")) => salt + ":" + crypto.scryptSync(p,salt,64).toString("hex");
 function passwordMatches(p, stored) {
   if (!stored) return false;
@@ -104,7 +107,18 @@ async function restoreOrder(orderId){
   catch(e){await c.query("rollback");console.error("[orders] stock restore failed:",e.code||"unknown");}finally{c.release();}
 }
 
-app.get("/api/health",asyncRoute(async(req,res)=>{await pool.query("select 1");res.json({status:"ok",database:"supabase-postgresql",payments:payReady()?"configured":"manual-order-mode"});}));
+app.post("/api/admin/uploads",auth,adminOnly,express.raw({type:["image/jpeg","image/png","image/webp","image/avif"],limit:"10mb"}),asyncRoute(async(req,res)=>{
+  if(!SUPABASE_SERVICE_ROLE_KEY)return res.status(503).json({error:"Image uploads are not configured. Add SUPABASE_SERVICE_ROLE_KEY to Render."});
+  const mime=req.get("content-type")||"",buffer=req.body;
+  if(!Buffer.isBuffer(buffer)||!buffer.length||buffer.length>10*1024*1024)return res.status(400).json({error:"Choose an image smaller than 10 MB."});
+  const signatures={"image/jpeg":buffer[0]===255&&buffer[1]===216&&buffer[2]===255,"image/png":buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),"image/webp":buffer.toString("ascii",0,4)==="RIFF"&&buffer.toString("ascii",8,12)==="WEBP","image/avif":/ftypavis|ftypavif/.test(buffer.toString("ascii",4,16))};
+  if(!signatures[mime])return res.status(415).json({error:"Use a valid JPEG, PNG, WebP or AVIF image."});
+  const ext={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/avif":"avif"}[mime],objectPath="products/"+Date.now()+"-"+crypto.randomBytes(8).toString("hex")+"."+ext;
+  const uploaded=await fetch(SUPABASE_URL+"/storage/v1/object/"+PRODUCT_IMAGE_BUCKET+"/"+objectPath,{method:"POST",headers:{apikey:SUPABASE_SERVICE_ROLE_KEY,authorization:"Bearer "+SUPABASE_SERVICE_ROLE_KEY,"content-type":mime,"cache-control":"public, max-age=31536000","x-upsert":"false"},body:buffer});
+  if(!uploaded.ok){const detail=await uploaded.json().catch(()=>({}));console.error("[storage] upload failed:",uploaded.status,detail.error||detail.message||"unknown");return res.status(502).json({error:"Image upload failed. Please try again."});}
+  res.status(201).json({url:SUPABASE_URL+"/storage/v1/object/public/"+PRODUCT_IMAGE_BUCKET+"/"+objectPath});
+}));
+app.get("/api/health",asyncRoute(async(req,res)=>{await pool.query("select 1");res.json({status:"ok",database:"supabase-postgresql",payments:payReady()?"configured":"manual-order-mode",imageUploads:SUPABASE_SERVICE_ROLE_KEY?"configured":"not-configured"});}));
 app.post("/api/auth/register",asyncRoute(async(req,res)=>{
   const {name,email,password}=req.body||{},mail=String(email||"").trim().toLowerCase();
   if(!validText(name,100)||!validEmail(mail)||typeof password!=="string"||password.length<8||password.length>200)return res.status(400).json({error:"Enter your name, a valid email and a password of at least 8 characters."});
@@ -141,22 +155,23 @@ app.get("/auth/google/callback",asyncRoute(async(req,res)=>{
 app.post("/api/auth/logout",asyncRoute(async(req,res)=>{const token=readCookie(req,COOKIE);if(token)await pool.query("delete from public.sessions where token_hash=$1",[hash(token)]);clearCookie(res);res.json({message:"Signed out."});}));
 app.get("/api/auth/me",auth,(req,res)=>res.json({user:cleanUser(req.user)}));
 
-app.get("/api/products",asyncRoute(async(req,res)=>{const r=await pool.query("select id,name,description,price,image,slug,sku,category,audience,stock,status,featured,created_at from public.products where status='active' and stock>0 order by featured desc,created_at desc,id desc");res.json(r.rows.map(cleanProduct));}));
-const listProducts=async()=>{const r=await pool.query("select id,name,description,price,image,slug,sku,category,audience,stock,status,featured,created_at from public.products order by created_at desc,id desc");return r.rows.map(cleanProduct);};
+app.get("/api/products",asyncRoute(async(req,res)=>{const r=await pool.query("select id,name,description,price,image,images,slug,sku,category,audience,stock,status,featured,created_at from public.products where status='active' and stock>0 order by featured desc,created_at desc,id desc");res.json(r.rows.map(cleanProduct));}));
+const listProducts=async()=>{const r=await pool.query("select id,name,description,price,image,images,slug,sku,category,audience,stock,status,featured,created_at from public.products order by created_at desc,id desc");return r.rows.map(cleanProduct);};
 app.get(["/api/admin/products","/api/seller/products"],auth,adminOnly,asyncRoute(async(req,res)=>res.json(await listProducts())));
 app.post(["/api/admin/products","/api/seller/products"],auth,adminOnly,asyncRoute(async(req,res)=>{
-  const {name,description,price,image,stock=0,category="Essentials",audience="Unisex",sku=null}=req.body||{},p=Number(price),q=Number(stock);
-  if(!validText(name,120)||!validText(description,2000)||!Number.isFinite(p)||p<0||!validText(image,2000)||!Number.isInteger(q)||q<0||!validText(category,60)||!["Men","Women","Unisex"].includes(audience))return res.status(400).json({error:"Check product details, price, category, audience and stock."});
+  const {name,description,price,image,images,stock=0,category="Essentials",audience="Unisex",sku=null,featured=false,status="active"}=req.body||{},p=Number(price),q=Number(stock),gallery=Array.isArray(images)?images:(image?[image]:[]),primary=gallery[0]||image;
+  if(!validText(name,120)||!validText(description,2000)||!Number.isFinite(p)||p<0||!validText(primary,2000)||!gallery.length||gallery.length>8||gallery.some(u=>!validText(u,2000)||!/^https:\/\//i.test(u))||!Number.isInteger(q)||q<0||!validText(category,60)||!["Men","Women","Unisex"].includes(audience)||!["draft","active","archived"].includes(status))return res.status(400).json({error:"Check product details, photos, price, category, audience and stock."});
   const slug=name.toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")+"-"+crypto.randomBytes(3).toString("hex");
-  const r=await pool.query("insert into public.products(name,description,price,image,slug,sku,category,audience,stock,status,featured) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',false) returning *",[name.trim(),description.trim(),p,image.trim(),slug,sku,category.trim(),audience,q]);
+  const r=await pool.query("insert into public.products(name,description,price,image,images,slug,sku,category,audience,stock,status,featured) values($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12) returning *",[name.trim(),description.trim(),p,primary,JSON.stringify(gallery),slug,sku,category.trim(),audience,q,status,Boolean(featured)]);
   res.status(201).json({product:cleanProduct(r.rows[0]),message:"Product added to STND."});
 }));
 app.patch(["/api/admin/products/:id","/api/seller/products/:id"],auth,adminOnly,asyncRoute(async(req,res)=>{
-  const id=Number(req.params.id),patch=req.body||{},allowed=["name","description","price","image","stock","category","audience","featured","status","sku"];
+  const id=Number(req.params.id),patch=req.body||{},allowed=["name","description","price","image","images","stock","category","audience","featured","status","sku"];
   if(!Number.isSafeInteger(id)||!Object.keys(patch).length||Object.keys(patch).some(k=>!allowed.includes(k)))return res.status(400).json({error:"Invalid product update."});
   const found=await pool.query("select * from public.products where id=$1",[id]);if(!found.rowCount)return res.status(404).json({error:"Product not found."});
-  const n={...found.rows[0],...patch};if(!validText(n.name,120)||!validText(n.description,2000)||!Number.isFinite(Number(n.price))||Number(n.price)<0||!validText(n.image,2000)||!Number.isInteger(Number(n.stock))||Number(n.stock)<0||!validText(n.category,60)||!["Men","Women","Unisex"].includes(n.audience)||!["draft","active","archived"].includes(n.status))return res.status(400).json({error:"Invalid product details."});
-  const r=await pool.query("update public.products set name=$1,description=$2,price=$3,image=$4,stock=$5,category=$6,audience=$7,featured=$8,status=$9,sku=$10,updated_at=now() where id=$11 returning *",[n.name.trim(),n.description.trim(),Number(n.price),n.image.trim(),Number(n.stock),n.category.trim(),n.audience,Boolean(n.featured),n.status,n.sku||null,id]);res.json({product:cleanProduct(r.rows[0]),message:"Product updated."});
+  const n={...found.rows[0],...patch},gallery=Array.isArray(n.images)?n.images:(n.image?[n.image]:[]),primary=gallery[0]||n.image;
+  if(!validText(n.name,120)||!validText(n.description,2000)||!Number.isFinite(Number(n.price))||Number(n.price)<0||!validText(primary,2000)||!gallery.length||gallery.length>8||gallery.some(u=>!validText(u,2000)||!/^https:\/\//i.test(u))||!Number.isInteger(Number(n.stock))||Number(n.stock)<0||!validText(n.category,60)||!["Men","Women","Unisex"].includes(n.audience)||!["draft","active","archived"].includes(n.status))return res.status(400).json({error:"Invalid product details."});
+  const r=await pool.query("update public.products set name=$1,description=$2,price=$3,image=$4,images=$5::jsonb,stock=$6,category=$7,audience=$8,featured=$9,status=$10,sku=$11,updated_at=now() where id=$12 returning *",[n.name.trim(),n.description.trim(),Number(n.price),primary,JSON.stringify(gallery),Number(n.stock),n.category.trim(),n.audience,Boolean(n.featured),n.status,n.sku||null,id]);res.json({product:cleanProduct(r.rows[0]),message:"Product updated."});
 }));
 app.delete(["/api/admin/products/:id","/api/seller/products/:id"],auth,adminOnly,asyncRoute(async(req,res)=>{const r=await pool.query("update public.products set status='archived',stock=0,updated_at=now() where id=$1 and status<>'archived' returning id",[Number(req.params.id)]);if(!r.rowCount)return res.status(404).json({error:"Product not found."});res.json({message:"Product archived."});}));
 app.get(["/api/admin/orders","/api/seller/orders"],auth,adminOnly,asyncRoute(async(req,res)=>{const r=await pool.query("select o.id,o.status,o.payment_status,o.total,o.created_at,c.name customer_name,c.email customer_email,oi.product_id,oi.quantity,oi.unit_price,coalesce(oi.product_name,p.name) product_name from public.orders o join public.customers c on c.id=o.customer_id join public.order_items oi on oi.order_id=o.id left join public.products p on p.id=oi.product_id order by o.created_at desc,o.id desc");res.json(r.rows.map(x=>({...x,id:Number(x.id),product_id:Number(x.product_id),quantity:Number(x.quantity),total:Number(x.total),unit_price:Number(x.unit_price)})));}));
