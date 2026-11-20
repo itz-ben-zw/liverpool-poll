@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "db:check": "node db-check.js"
+    "db:check": "node db-check.js",
+    "check": "node --check server.js && node scripts/check-inline-js.js"
   },
   "engines": {
     "node": ">=22.5.0"
