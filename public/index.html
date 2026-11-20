@@ -156,6 +156,24 @@ async function inventoryAction(e){const b=e.target.closest("button");if(!b)retur
 async function loadBuyerOrders(){try{const orders=await api("/api/orders");$("#buyerOrderList").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+'</strong><small>'+esc(o.status)+' · '+esc(o.created_at)+'</small></div><b>$'+money(o.total)+'</b></div>').join(""):"No orders yet."}catch(e){$("#buyerOrderList").textContent=e.message}}
 $("#menuToggle").onclick=()=>$("#navlinks").classList.toggle("open");
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){accountOpen(false);cartPanel(false)}});
-(async()=>{await loadProducts();try{currentUser=(await api("/api/auth/me")).user;$("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0]}catch{}})();
+async function handlePaymentReturn(){
+ const params=new URLSearchParams(location.search);
+ if(params.get("payment")!=="return")return;
+ const orderId=params.get("order");
+ cartPanel(true);
+ $("#message").textContent="Checking your payment with Pesepay…";
+ for(let attempt=0;attempt<8;attempt++){
+  try{
+   const result=await api("/api/payments/status?orderId="+encodeURIComponent(orderId));
+   if(result.status==="paid"){$("#message").textContent="Payment confirmed. Order #"+result.orderId+" is paid. Thank you for shopping STND.";history.replaceState({},"",location.pathname);return}
+   if(result.status==="payment_failed"){$("#message").textContent="Payment was not completed. Your order was not confirmed. You can try again.";history.replaceState({},"",location.pathname);return}
+   $("#message").textContent="Payment is still processing. Please wait…";
+  }catch(error){$("#message").textContent="We couldn't verify the payment yet. Refresh your orders in a moment."}
+  await new Promise(resolve=>setTimeout(resolve,2500));
+ }
+ $("#message").textContent="Your payment is still being confirmed. Check your account orders before trying again.";
+ history.replaceState({},"",location.pathname);
+}
+(async()=>{await loadProducts();try{currentUser=(await api("/api/auth/me")).user;$("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0]}catch{}await handlePaymentReturn()})();
 </script>
 </body></html>
