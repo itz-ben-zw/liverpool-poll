@@ -91,9 +91,10 @@ function initRack(product,colours){
  sizeSelect.addEventListener("change",syncStock);
  byId("rackFront").onclick=()=>{front=true;setFrontBack();};byId("rackBack").onclick=()=>{front=false;setFrontBack();};
  add.onclick=()=>{if(!selectedSize||Number(selectedSize.stock)<1)return;const variantId=Number(selectedSize.id),existing=cart.find(x=>Number(x.id)===Number(product.id)&&Number(x.variantId)===variantId);if(existing){if(existing.quantity>=Number(selectedSize.stock)){byId("rackStock").textContent="You've reached the available stock.";return;}existing.quantity++;}else cart.push({id:Number(product.id),variantId,variantLabel:colours[active].name+" / "+selectedSize.size,variantStock:Number(selectedSize.stock),priceAdjustment:Number(selectedSize.priceAdjustment||0),quantity:1});renderCart();byId("message").textContent="Added "+colours[active].name+" / "+selectedSize.size+" to your bag.";};
- stage.addEventListener("pointerdown",e=>{drag={x:e.clientX,start:position,moved:false};});
+ stage.addEventListener("pointerdown",e=>{drag={x:e.clientX,start:position,moved:false};stage.classList.add("is-dragging");});
  window.addEventListener("pointermove",e=>{if(!drag)return;const dx=e.clientX-drag.x;if(Math.abs(dx)>7)drag.moved=true;if(drag.moved){position=Math.max(-.2,Math.min(colours.length-.8,drag.start-dx/Math.max(76,Math.min(130,stage.clientWidth*.24))));render();}});
- window.addEventListener("pointerup",()=>{if(!drag)return;const moved=drag.moved;stage._dragged=moved;if(moved){go(Math.round(position));setTimeout(()=>{stage._dragged=false;},0);}drag=null;});
+ window.addEventListener("pointerup",()=>{if(!drag)return;const moved=drag.moved;stage.classList.remove("is-dragging");stage._dragged=moved;if(moved){go(Math.round(position));setTimeout(()=>{stage._dragged=false;},0);}drag=null;});
+ stage.addEventListener("pointercancel",()=>{drag=null;stage.classList.remove("is-dragging");});
  stage.addEventListener("wheel",e=>{const delta=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;if(Math.abs(delta)>8){e.preventDefault();go(active+(delta>0?1:-1));}},{passive:false});
  render();updatePanel();
 }
