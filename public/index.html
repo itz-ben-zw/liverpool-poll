@@ -31,12 +31,45 @@
 .js-motion .hero-copy>*{will-change:transform,opacity}
 .hero-image img,.drop-image img,.category-card img{will-change:transform}
 @media(prefers-reduced-motion:reduce){.intro-screen{display:none!important}.js-motion [data-reveal]{opacity:1!important;transform:none!important}}
+
+/* STND. terms acknowledgement */
+.terms-overlay{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(7px)}
+.terms-overlay.open{display:flex}
+.terms-card{width:min(560px,100%);max-height:min(88dvh,760px);overflow:auto;background:#f7f7f5;color:#111;padding:clamp(26px,5vw,48px);box-shadow:0 24px 90px #0007}
+.terms-mark{font:900 34px/.8 var(--display);letter-spacing:-.04em}.terms-mark span{color:var(--red)}
+.terms-kicker{margin:32px 0 12px;color:var(--red);font-size:9px;font-weight:700;letter-spacing:.22em;text-transform:uppercase}
+.terms-card h2{font:800 clamp(42px,8vw,64px)/.85 var(--display);text-transform:uppercase;margin:0 0 18px}
+.terms-lead{font-size:12px;line-height:1.8;color:#555;margin:0 0 24px}
+.terms-points{display:grid;gap:14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:20px 0;margin:0 0 22px}
+.terms-points strong{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.terms-points p{font-size:11px;line-height:1.7;color:#666;margin:0}
+.terms-foot{font-size:9px;line-height:1.7;color:#777;margin:0 0 18px}
+.terms-accept{width:100%;justify-content:center;gap:14px}
+.terms-card a{color:var(--red);text-decoration:underline;text-underline-offset:3px}
+@media(max-width:480px){.terms-overlay{padding:12px}.terms-card{padding:25px 21px}.terms-kicker{margin-top:25px}}
 </style>
 </head>
 <body>
 <div class="intro-screen" id="introScreen" aria-label="STND. Beyond the standard"><div class="intro-inner"><div class="intro-kicker">A new point of view</div><div class="intro-word" aria-label="STND"><span class="intro-letter">S</span><span class="intro-letter">T</span><span class="intro-letter">N</span><span class="intro-letter">D</span><span class="intro-letter intro-period">.</span></div><div class="intro-rule"></div><div class="intro-foot">BEYOND THE STANDARD · COLLECTION 001</div></div></div>
 
-<header class="nav"><a class="brand" href="#" aria-label="STND home">STND<span>.</span></a><nav class="navlinks" id="navlinks"><a href="#shop" data-open-shop="all">Shop all</a><a href="#shop" data-open-shop="Men">Men</a><a href="#shop" data-open-shop="Women">Women</a><a href="#collections">Collections</a><a href="#footer">Our world</a></nav><div class="navright"><button class="nav-action" id="openAccount">Account ↗</button><button class="nav-action" id="openCart">Bag <span class="bag-count" id="count">0</span></button><button class="menu-toggle" id="menuToggle" aria-label="Open navigation">☰</button></div></header>
+
+<div class="terms-overlay" id="termsOverlay" role="dialog" aria-modal="true" aria-labelledby="termsTitle">
+ <section class="terms-card">
+  <div class="terms-mark">STND<span>.</span></div>
+  <p class="terms-kicker">A moment before you enter</p>
+  <h2 id="termsTitle">Know the<br>standard.</h2>
+  <p class="terms-lead">Welcome to STND. Please take a moment to understand how this storefront works before continuing.</p>
+  <div class="terms-points">
+   <div><strong>01 / Orders</strong><p>Product availability and prices are shown on the store. Submitting checkout places an order request; it does not guarantee acceptance or availability.</p></div>
+   <div><strong>02 / Payments</strong><p>Online payments are not currently enabled. Do not send payment details through this website.</p></div>
+   <div><strong>03 / Product details</strong><p>We aim to present accurate descriptions and images. Colours may look different across screens, and product details may change.</p></div>
+   <div><strong>04 / Your information</strong><p>Information submitted during account creation or checkout is used to operate the storefront and manage orders.</p></div>
+  </div>
+  <p class="terms-foot">By selecting “I Understand”, you acknowledge this notice and agree to continue using the STND. storefront. This notice is a basic store summary, not a substitute for complete legal terms or a privacy policy.</p>
+  <button class="button-red terms-accept" id="termsAccept" type="button">I Understand <span>↗</span></button>
+ </section>
+</div>
+\n<header class="nav"><a class="brand" href="#" aria-label="STND home">STND<span>.</span></a><nav class="navlinks" id="navlinks"><a href="#shop" data-open-shop="all">Shop all</a><a href="#shop" data-open-shop="Men">Men</a><a href="#shop" data-open-shop="Women">Women</a><a href="#collections">Collections</a><a href="#footer">Our world</a></nav><div class="navright"><button class="nav-action" id="openAccount">Account ↗</button><button class="nav-action" id="openCart">Bag <span class="bag-count" id="count">0</span></button><button class="menu-toggle" id="menuToggle" aria-label="Open navigation">☰</button></div></header>
 <main id="home">
 <section class="hero"><div class="hero-copy"><p class="eyebrow">STND. / COLLECTION 001</p><h1>Beyond<br>the <span>standard.</span></h1><p>A considered wardrobe for every version of you. Contemporary pieces, enduring silhouettes and details that speak for themselves.</p><a class="button-red" href="#shop" data-open-shop="all">Discover the collection <span>↗</span></a><div class="hero-index">01 — 03 &nbsp; / &nbsp; MEN · WOMEN · OBJECTS</div></div><div class="hero-image"><img src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=1600&q=90" alt="Contemporary fashion editorial campaign"><div class="hero-image-label">DRESS LIKE YOU MEAN IT. / 001</div></div></section>
 <div class="ticker"><span>STND. / BEYOND THE STANDARD</span><b>✳</b><span>COLLECTION 001</span><b>✳</b><span>FORM. FUNCTION. EXPRESSION.</span><b>✳</b><span>STND. / BEYOND THE STANDARD</span></div>
