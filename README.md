@@ -53,3 +53,15 @@ Add these environment variables to the Render web service:
 For local development, use `http://localhost:3000/auth/google/callback` as the redirect URI and set `GOOGLE_REDIRECT_URI` accordingly. Add both local and production callback URLs to the Google OAuth client if you use both.
 
 The first Google sign-in creates a QuickCart account. New accounts use the selected buyer or seller role. If a verified Google email matches an existing QuickCart account, the Google identity is linked to that account. Google ID tokens are verified on the server using Google's Node.js authentication library. Existing email/password sign-in remains available.
+
+## 3D packaging storefront
+
+The marketplace product tiles now render real-time Three.js packaging models in WebGL. Each package is assembled as 3D geometry with a product-specific printed label, studio lighting, slow rotation, pointer-driven tilt and GSAP hover motion. Rendering is limited to visible cards; a static packaging fallback remains when WebGL is unavailable, and reduced-motion preferences disable the animation.
+
+The browser also attempts to load an exported GLB at `public/models/product-<id>.glb`. If no matching GLB exists, it uses the built-in Three.js model so the storefront still works. Seller-created products receive the procedural model automatically.
+
+### Export Blender GLB assets
+
+A Blender Python exporter is included at `scripts/blender/create_packaging.py`. Open Blender, switch to the Scripting workspace, load that script and run it. It exports the six seeded packaging assets into `public/models/`. Commit those generated GLB files to make Blender-authored packaging replace the browser-generated versions. The current hosted experience uses the live procedural Three.js models until those Blender assets are exported and committed.
+
+Three.js and GSAP are installed as app dependencies and served from the app itself, rather than relying on a third-party CDN.
