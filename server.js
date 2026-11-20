@@ -342,7 +342,7 @@ app.get("/api/seller/orders",auth,requireRole("seller"),(req,res)=>{
     oi.product_id,oi.quantity,oi.unit_price,p.name AS product_name
     FROM orders o JOIN customers c ON c.id=o.customer_id
     JOIN order_items oi ON oi.order_id=o.id JOIN products p ON p.id=oi.product_id
-    WHERE p.seller_id=? ORDER BY o.created_at DESC,o.id DESC`).all(req.user.id);
+    WHERE p.seller_id=? AND o.status='paid' ORDER BY o.created_at DESC,o.id DESC`).all(req.user.id);
   res.json(rows.map(r=>({...r,total:Number(r.total),unit_price:Number(r.unit_price)})));
 });
 
