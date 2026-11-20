@@ -9,8 +9,11 @@
 .rack-single-experience{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(260px,.92fr);gap:clamp(20px,4vw,54px);align-items:center;margin:8px 0 30px;padding:clamp(14px,2vw,24px);background:#ecebe7;color:#111}
 .rack-single-stage{height:clamp(360px,48vw,520px);min-height:340px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 72%,#fff,transparent 62%),linear-gradient(145deg,#f2f1ed,#e3e1dc)}
 .rack-single-rail{position:absolute;left:-5%;right:-5%;top:54px;height:3px;background:#292927;transform:rotate(-2deg)}
-.rack-single-hanger{position:absolute;top:48px;left:50%;transform:translateX(-50%);width:min(54%,250px);height:90px;z-index:2}
-.rack-single-image{position:absolute;inset:110px 8% 28px;width:84%;height:calc(100% - 138px);object-fit:contain;object-position:center;filter:drop-shadow(0 16px 16px #0002)}
+.rack-single-garment{position:absolute;inset:42px 8% 28px;transform-origin:50% 0;animation:rack-single-sway 3.6s ease-in-out infinite;will-change:transform}
+.rack-single-hanger{position:absolute;top:0;left:50%;transform:translateX(-50%);width:min(54%,250px);height:90px;z-index:2}
+.rack-single-image{position:absolute;inset:68px 0 0;width:100%;height:calc(100% - 68px);object-fit:contain;object-position:center top;filter:drop-shadow(0 16px 16px #0002)}
+@keyframes rack-single-sway{0%,100%{transform:rotate(-1.6deg)}50%{transform:rotate(1.6deg)}}
+@media(prefers-reduced-motion:reduce){.rack-single-garment{animation:none;transform:none}}
 .rack-single-label{position:absolute;bottom:14px;left:16px;font-size:9px;letter-spacing:.18em;color:#777}
 .rack-single-no-image{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#777}
 .rack-single-panel{min-width:0}
