@@ -156,7 +156,64 @@ const validText = (v,max=500) => typeof v==="string" && v.trim().length>0 && v.t
 const emailOk = v => typeof v==="string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const publicProduct = p => ({...p, price:Number(p.price), stock:Number(p.stock), seller_id:p.seller_id===null?null:Number(p.seller_id), active:Boolean(p.active)});
 
-app.get("/api/health",(req,res)=>res.json({status:"ok",database:"connected",timestamp:new Date().toISOString()}));
+function pesepayReady(){return Boolean(PESEPAY_INTEGRATION_KEY && PESEPAY_ENCRYPTION_KEY && PESEPAY_ENCRYPTION_KEY.length===32);}
+function encryptPesepay(value){
+  const cipher=crypto.createCipheriv("aes-256-cbc",Buffer.from(PESEPAY_ENCRYPTION_KEY,"utf8"),Buffer.from(PESEPAY_ENCRYPTION_KEY.slice(0,16),"utf8"));
+  return Buffer.concat([cipher.update(JSON.stringify(value),"utf8"),cipher.final()]).toString("base64");
+}
+function decryptPesepay(value){
+  const decipher=crypto.createDecipheriv("aes-256-cbc",Buffer.from(PESEPAY_ENCRYPTION_KEY,"utf8"),Buffer.from(PESEPAY_ENCRYPTION_KEY.slice(0,16),"utf8"));
+  return JSON.parse(Buffer.concat([decipher.update(Buffer.from(value,"base64")),decipher.final()]).toString("utf8"));
+}
+async function pesepayRequest(url,options={}){
+  const response=await fetch(url,{...options,headers:{authorization:PESEPAY_INTEGRATION_KEY,"content-type":"application/json",...(options.headers||{})}});
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(body.message||body.error||("Pesepay request failed ("+response.status+")."));
+  return body;
+}
+async function initiatePesepayPayment(orderId,total){
+  const payload=encryptPesepay({amountDetails:{amount:Number(total.toFixed(2)),currencyCode:"USD"},reasonForPayment:"STND. order #"+orderId,merchantReference:"STND-"+orderId,resultUrl:APP_BASE_URL+"/payments/pesepay/result",returnUrl:APP_BASE_URL+"/payment/return?order="+orderId});
+  const body=await pesepayRequest(PESEPAY_BASE_URL+"/payments/initiate",{method:"POST",body:JSON.stringify({payload})});
+  if(!body.payload)throw Error("Pesepay did not return a checkout payload.");
+  const result=decryptPesepay(body.payload);
+  if(!result.referenceNumber||!result.redirectUrl)throw Error("Pesepay returned an incomplete checkout response.");
+  db.prepare("UPDATE orders SET payment_reference=?,payment_provider='pesepay',status='pending_payment' WHERE id=?").run(result.referenceNumber,orderId);
+  return result;
+}
+async function confirmPesepayPayment(referenceNumber){
+  if(!pesepayReady())throw Error("Pesepay sandbox is not configured.");
+  const url=new URL(PESEPAY_BASE_URL+"/payments/check-payment");
+  url.searchParams.set("referenceNumber",referenceNumber);
+  const body=await pesepayRequest(url.toString());
+  if(!body.payload)throw Error("Pesepay status response was incomplete.");
+  return decryptPesepay(body.payload);
+}
+function settlePesepayResult(result){
+  const order=db.prepare("SELECT * FROM orders WHERE payment_reference=?").get(result.referenceNumber);
+  if(!order)return {ignored:true};
+  if(order.status==="paid")return {alreadyPaid:true};
+  const amount=Number(result.amountDetails?.amount);
+  const currency=String(result.amountDetails?.currencyCode||"").toUpperCase();
+  if(currency!=="USD"||!Number.isFinite(amount)||Math.abs(amount-Number(order.total))>0.009)throw Error("Pesepay amount or currency did not match the order.");
+  if(result.transactionStatus==="SUCCESS"){
+    db.prepare("UPDATE orders SET status='paid' WHERE id=? AND status!='paid'").run(order.id);
+    return {paid:true,orderId:order.id};
+  }
+  if(["FAILED","CANCELLED","REVERSED","EXPIRED"].includes(String(result.transactionStatus||"").toUpperCase())){
+    db.exec("BEGIN IMMEDIATE");
+    try{
+      const changed=db.prepare("UPDATE orders SET status='payment_failed' WHERE id=? AND status='pending_payment'").run(order.id);
+      if(changed.changes){
+        const rows=db.prepare("SELECT product_id,quantity FROM order_items WHERE order_id=?").all(order.id);
+        const restore=db.prepare("UPDATE products SET stock=stock+? WHERE id=?");
+        rows.forEach(item=>restore.run(item.quantity,item.product_id));
+      }
+      db.exec("COMMIT");
+    }catch(e){try{db.exec("ROLLBACK")}catch{}throw e;}
+  }
+  return {status:result.transactionStatus||"PENDING",orderId:order.id};
+}
+app.get("/api/health",(req,res)=>res.json({status:"ok",database:"connected",payments:pesepayReady()?"sandbox_configured":"not_configured",timestamp:new Date().toISOString()}));
 
 app.post("/api/auth/register",(req,res)=>{
   const {name,email,password,role="buyer"}=req.body||{};
