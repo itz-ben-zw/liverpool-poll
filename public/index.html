@@ -192,7 +192,379 @@ function editProduct(p){const f=$("#sellerForm");f.elements.productId.value=p.id
 function renderProductGallery(urls){$("#productGalleryPreview").innerHTML=(urls||[]).filter(Boolean).map(u=>'<img src="'+esc(u)+'" alt="Product photo preview" loading="lazy">').join("")}
 async function previewNewPhotos(){const f=$("#sellerForm"),urls=f.elements.imageUrls.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);const previews=await Promise.all([...f.elements.photos.files].map(file=>new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.readAsDataURL(file)})));renderProductGallery([...urls,...previews])}
 async function saveProduct(e){e.preventDefault();const f=e.currentTarget,button=$("#productSaveButton"),message=$("#productEditorMessage");button.disabled=true;message.textContent="Saving product…";try{const id=f.elements.productId.value,urls=f.elements.imageUrls.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean),files=[...f.elements.photos.files];if(urls.length+files.length>8)throw Error("A product can have up to 8 photos.");for(const file of files){if(file.size>10*1024*1024)throw Error(file.name+" is larger than 10 MB.");urls.push(await uploadProductImage(file))}if(!urls.length)throw Error("Add at least one product photo or image URL.");const data={name:f.elements.name.value.trim(),description:f.elements.description.value.trim(),price:Number(f.elements.price.value),images:urls,image:urls[0],category:f.elements.category.value,audience:f.elements.audience.value,sku:f.elements.sku.value.trim()||null,stock:Number(f.elements.stock.value),status:f.elements.status.value,featured:f.elements.featured.checked};const saved=await api(id?"/api/admin/products/"+id:"/api/admin/products",{method:id?"PATCH":"POST",body:JSON.stringify(data)});const productId=Number(id||saved.product.id);const variantLines=f.elements.variants.value.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);if(variantLines.length){const variants=variantLines.map((line,index)=>{const parts=line.split("|").map(part=>part.trim());if(parts.length<4)throw Error("Variant row "+(index+1)+" needs Colour | Size | SKU | Stock.");return {colour:parts[0],size:parts[1],sku:parts[2],stock:Number(parts[3]),frontImage:parts[4]||null,backImage:parts[5]||null,priceAdjustment:0};});await api("/api/admin/products/"+productId+"/variants",{method:"PUT",body:JSON.stringify({variants})});}resetProductEditor();await loadSeller();await loadProducts();message.textContent="Product saved. Storefront updated."}catch(err){message.textContent=err.message}finally{button.disabled=false}}
-async function loadSeller(){try{sellerProducts=await api("/api/admin/products");$("#sellerMetricProducts").textContent=sellerProducts.length;$("#sellerMetricActive").textContent=sellerProducts.filter(p=>p.active).length;$("#sellerMetricStock").textContent=sellerProducts.filter(p=>p.active).reduce((s,p)=>s+Number(p.stock||0),0);$("#inventoryList").innerHTML=sellerProducts.length?sellerProducts.map(p=>'<div class="inventory-item"><div><strong>'+esc(p.name)+'</strong><small>$'+money(p.price)+' · Stock: '+p.stock+' · '+(p.active?"Listed":"Not active")+' · '+(p.images?.length||1)+' photo(s)</small></div><div class="inventory-actions"><button data-stock="-1" data-id="'+p.id+'">−</button><button data-stock="1" data-id="'+p.id+'">+ qty</button><button data-edit="'+p.id+'">Edit details</button><button data-delete="'+p.id+'">Archive</button></div></div>').join(""):'<div class="account-empty">No products yet. Add the first STND product.</div>';$("#inventoryList").onclick=inventoryAction;const orders=await api("/api/admin/orders");$("#sellerMetricSales").textContent="$"+money(orders.reduce((s,o)=>s+Number(o.unit_price)*Number(o.quantity),0));$("#sellerOrders").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+' · '+esc(o.product_name)+'</strong><small>'+esc(o.customer_name)+' · Qty '+o.quantity+'</small></div><b>$'+money(o.unit_price*o.quantity)+'</b></div>').join(""):"No orders for your products yet."}catch(e){$("#inventoryList").textContent=e.message}}
+async function loadSeller(){try{sellerProducts=await api("/api/admin/products");$("#sellerMetricProducts").textContent=sellerProducts.length;$("#sellerMetricActive").textContent=sellerProducts.filter(p=>p.active).length;$("#sellerMetricStock").textContent=sellerProducts.filter(p=>p.active).reduce((s,p)=>s+Number(p.stock||0),0);$("#inventoryList").innerHTML=sellerProducts.length?sellerProducts.map(p=>'<div class="inventory-item"><div><strong>'+esc(p.name)+'</strong><small>).join(""):'<div class="account-empty">No products yet. Add the first STND product.</div>';$("#inventoryList").onclick=inventoryAction;const orders=await api("/api/admin/orders");$("#sellerMetricSales").textContent="$"+money(orders.reduce((s,o)=>s+Number(o.unit_price)*Number(o.quantity),0));$("#sellerOrders").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+' · '+esc(o.product_name)+'</strong><small>'+esc(o.customer_name)+(o.variant_label?' · '+esc(o.variant_label):'')+' · Qty '+o.quantity+'</small></div><b>).join(""):"No orders for your products yet."}catch(e){$("#inventoryList").textContent=e.message}}
+async function inventoryAction(e){const b=e.target.closest("button");if(!b)return;const id=Number(b.dataset.id||b.dataset.edit||b.dataset.delete),p=sellerProducts.find(x=>x.id===id);if(!p)return;try{if(b.dataset.stock)await api("/api/admin/products/"+id,{method:"PATCH",body:JSON.stringify({stock:Math.max(0,p.stock+Number(b.dataset.stock))})});else if(b.dataset.delete){if(!confirm("Archive "+p.name+"? It will no longer appear in the storefront."))return;await api("/api/admin/products/"+id,{method:"DELETE"})}else if(b.dataset.edit){editProduct(p);return}await loadSeller();await loadProducts()}catch(err){alert(err.message)}}
+async function loadBuyerOrders(){try{const orders=await api("/api/orders");$("#buyerOrderList").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+'</strong><small>'+esc(o.status)+' · '+esc(o.created_at)+'</small></div><b>$'+money(o.total)+'</b></div>').join(""):"No orders yet."}catch(e){$("#buyerOrderList").textContent=e.message}}
+function initTermsNotice(){
+ const notice=$("#termsOverlay"),accept=$("#termsAccept");
+ if(!notice||!accept)return;
+ let accepted=false,isOpen=false,previousFocus=document.activeElement,previousOverflow=document.body.style.overflow;
+ let inertSnapshot=[];
+ try{accepted=localStorage.getItem("stndNoticeAccepted")==="yes"}catch{}
+ if(!accepted){
+  isOpen=true;
+  notice.classList.add("open");
+  notice.setAttribute("aria-hidden","false");
+  inertSnapshot=[...document.body.children].filter(node=>node!==notice).map(node=>[node,node.inert]);
+  inertSnapshot.forEach(([node])=>{node.inert=true});
+  document.body.style.overflow="hidden";
+  requestAnimationFrame(()=>accept.focus({preventScroll:true}));
+ }else{
+  notice.setAttribute("aria-hidden","true");
+ }
+ notice.addEventListener("keydown",e=>{
+  if(!isOpen||e.key!=="Tab")return;
+  const tabbable=[...notice.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>!el.hidden);
+  if(!tabbable.length){e.preventDefault();notice.querySelector(".terms-card")?.focus();return}
+  const first=tabbable[0],last=tabbable[tabbable.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+ });
+ accept.addEventListener("click",()=>{
+  if(!isOpen)return;
+  try{localStorage.setItem("stndNoticeAccepted","yes")}catch{}
+  isOpen=false;
+  notice.classList.remove("open");
+  notice.setAttribute("aria-hidden","true");
+  document.body.style.overflow=previousOverflow;
+  inertSnapshot.forEach(([node,wasInert])=>{node.inert=wasInert});
+  const target=previousFocus&&previousFocus!==document.body&&previousFocus.isConnected?previousFocus:$("#openAccount")||$(".brand");
+  target?.focus({preventScroll:true});
+ });
+}
+initTermsNotice();
+const policyContent={
+warranty:{title:"Warranty coverage",html:"<h3>Product-specific coverage</h3><p>Warranty coverage is not assumed to be the same for every item. Where a manufacturer or supplier warranty applies, its duration, covered faults and claim process should be stated on that product listing or supplied with the item.</p><h3>Before ordering</h3><p>If a listing does not state warranty coverage, contact STND. before placing an order to confirm what applies. Do not assume normal wear, accidental damage or misuse is covered.</p><p>This notice does not limit consumer rights that cannot legally be excluded. It is not a promise that every product carries a manufacturer warranty.</p>"},
+reviews:{title:"Customer reviews",html:"<p>See what customers are saying about the STND. collection. These sample reviews demonstrate how customer feedback will appear on the store.</p><div class=\"review-summary\"><div class=\"review-score\"><strong>4.9</strong><span>★★★★★</span><small>Sample rating</small></div><div class=\"review-bars\"><p><span>5 stars</span><span class=\"review-bar\"><i style=\"width:90%\"></i></span><b>90%</b></p><p><span>4 stars</span><span class=\"review-bar\"><i style=\"width:10%\"></i></span><b>10%</b></p></div></div><div class=\"review-list\"><article class=\"review-card\"><div class=\"review-card-top\"><strong>Everyday Essential</strong><span>★★★★★</span></div><p>Clean design, comfortable fit and easy to style. The kind of piece you keep reaching for.</p><small>Sample customer review · Clothing</small></article><article class=\"review-card\"><div class=\"review-card-top\"><strong>Great finishing</strong><span>★★★★★</span></div><p>The details make the difference. Simple, versatile and works with just about everything.</p><small>Sample customer review · Accessories</small></article><article class=\"review-card\"><div class=\"review-card-top\"><strong>Would recommend</strong><span>★★★★☆</span></div><p>Good everyday style without overcomplicating it. Looking forward to seeing more pieces.</p><small>Sample customer review · Footwear</small></article></div>"},
+privacy:{title:"Privacy policy",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Information collected</h3><p>When you create an account, the store processes your name, email address and password, which is stored as a password hash. At checkout, it processes the name, email address and delivery address you submit, together with order details.</p><h3>How information is used</h3><p>Information is used to operate accounts, process and communicate about orders, provide support, prevent misuse and maintain store security.</p><h3>Payments</h3><p>Payments are handled through Pesepay hosted checkout when available. Do not enter card or mobile-money credentials into STND. forms. Payment-provider data is handled under that provider's own privacy terms.</p><h3>Sharing and retention</h3><p>Information may be processed by service providers that host or operate the store. It is retained as needed for account, order, legal and security purposes. STND. does not claim to sell personal information.</p><h3>Your choices</h3><p>For access, correction or deletion requests, contact STND. through its official store contact channel. Some order or security records may need to be retained where required by law.</p>"},
+terms:{title:"Terms and conditions",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Using the store</h3><p>Use the storefront lawfully and provide accurate account, delivery and checkout information.</p><h3>Products, prices and availability</h3><p>Descriptions, images, prices and stock are provided for guidance and may be corrected or updated. Screen settings can affect colours. An item in your bag is not reserved until an order is accepted.</p><h3>Orders and payment</h3><p>Submitting checkout starts an order and payment process. An order is treated as paid only after the payment provider confirms a successful transaction. A redirect or reference number alone is not proof of payment. If payment fails or remains pending, do not assume the order is confirmed.</p><h3>Returns and consumer rights</h3><p>Any return, exchange or refund arrangement must be confirmed with STND. These terms do not remove consumer rights that apply under relevant law.</p><h3>Changes</h3><p>Store content and these terms may be updated. The version displayed here applies when you use the storefront.</p>"},
+cookies:{title:"Cookie policy",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Essential cookies</h3><p>STND. uses a session cookie to keep a signed-in account working and support secure account actions. This cookie is necessary for core account functionality.</p><h3>Other tracking</h3><p>The storefront is not intended to use advertising cookies or cross-site tracking cookies. Third-party services, including hosted payment pages, may apply their own cookies under their own policies.</p><h3>Managing cookies</h3><p>You can block or clear cookies in browser settings. If you block essential cookies, sign-in and account features may not work correctly.</p>"}
+};
+function openInfoDialog(selector,trigger){
+ const dialog=$(selector);
+ if(!dialog)return;
+ if(activeInfoDialog)closeInfo(false);
+ infoDialogOpener=trigger||document.activeElement;
+ activeInfoDialog=dialog;
+ infoDialogOverflow=document.body.style.overflow;
+ infoDialogInert=[...document.body.children].filter(node=>node!==dialog).map(node=>[node,node.inert]);
+ infoDialogInert.forEach(([node])=>{node.inert=true});
+ document.body.style.overflow="hidden";
+ dialog.setAttribute("aria-hidden","false");
+ dialog.classList.add("open");
+ requestAnimationFrame(()=>{const target=dialog.querySelector("[data-close-info]")||dialog.querySelector(".info-panel");target?.focus({preventScroll:true})});
+}
+function closeInfo(restoreFocus=true){
+ if(!activeInfoDialog)return;
+ const closing=activeInfoDialog;
+ closing.classList.remove("open");
+ closing.setAttribute("aria-hidden","true");
+ activeInfoDialog=null;
+ document.body.style.overflow=infoDialogOverflow;
+ infoDialogInert.forEach(([node,wasInert])=>{node.inert=wasInert});
+ infoDialogInert=[];
+ const target=infoDialogOpener;
+ infoDialogOpener=null;
+ if(restoreFocus&&target&&target.isConnected&&!target.inert)target.focus({preventScroll:true});
+}
+function trapInfoDialogFocus(e){
+ if(!activeInfoDialog||e.key!=="Tab")return;
+ const tabbable=[...activeInfoDialog.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>!el.hidden);
+ if(!tabbable.length){e.preventDefault();activeInfoDialog.querySelector(".info-panel")?.focus();return}
+ const first=tabbable[0],last=tabbable[tabbable.length-1];
+ if(e.shiftKey&&(document.activeElement===first||!activeInfoDialog.contains(document.activeElement))){e.preventDefault();last.focus()}
+ else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+}
+function openPolicy(key,trigger){const page=policyContent[key];if(!page)return;$("#policyTitle").textContent=page.title;$("#policyBody").innerHTML=page.html;openInfoDialog("#policyInfo",trigger)}
+function openProductInfo(id,trigger){const p=products.find(x=>Number(x.id)===Number(id));if(!p)return;$("#productInfoTitle").textContent=p.name;$("#productInfoBody").innerHTML=(p.images?.length?p.images:[p.image]).filter(Boolean).map(u=>"<img class='info-gallery-image' src='"+esc(u)+"' alt='"+esc(p.name)+"' loading='lazy'>").join("")+"<p>"+esc(p.description||"No additional description has been provided for this product.")+"</p><p class='info-product-price'>$"+money(p.price)+"</p><h3>Product details</h3><p>Category: "+esc(p.category||"Not specified")+". Availability: "+Number(p.stock||0)+" currently listed.</p><h3>Care and warranty</h3><p>Follow any care instructions supplied with the item. Warranty coverage is product-specific and is only included where stated on the product listing or supplied by the manufacturer or supplier. Contact STND. before ordering if you need confirmation.</p><h3>Customer reviews</h3><div id='productReviewList'>Loading reviews…</div><form id='productReviewForm' class='review-form'><label>Rating <select name='rating' required><option value=''>Choose a rating</option><option value='5'>★★★★★</option><option value='4'>★★★★</option><option value='3'>★★★</option><option value='2'>★★</option><option value='1'>★</option></select></label><input name='title' maxlength='100' placeholder='Review title (optional)'><textarea name='body' maxlength='1500' required placeholder='Share your experience…'></textarea><div class='review-form-actions'><button class='button-red' type='submit'>Submit review</button><small id='productReviewMessage'>Sign in to submit a review.</small></div></form><div class='info-actions'><button class='button-red' type='button' data-add-from-details='"+p.id+"'>Add to bag +</button></div>";openInfoDialog("#productInfo",trigger);loadProductReviews(id)}
+document.addEventListener("click",e=>{
+ const policy=e.target.closest("[data-policy]");if(policy){e.preventDefault();openPolicy(policy.dataset.policy,policy);return}
+ const detail=e.target.closest("[data-view-product]");if(detail){openProductInfo(detail.dataset.viewProduct,detail);return}
+ const addDetail=e.target.closest("[data-add-from-details]");if(addDetail){const p=products.find(x=>Number(x.id)===Number(addDetail.dataset.addFromDetails));if(!p)return;const item=cart.find(x=>x.id===p.id);if(item){if(item.quantity>=p.stock){$("#message").textContent="You've reached the available stock.";return}item.quantity++}else cart.push({id:p.id,quantity:1});renderCart();$("#message").textContent="Added to your bag.";closeInfo();return}
+ if(e.target.closest("[data-close-info]")||e.target.classList.contains("info-overlay"))closeInfo();
+});
+$("#menuToggle").onclick=()=>$("#navlinks").classList.toggle("open");
+document.addEventListener("keydown",e=>{
+ if(activeInfoDialog){
+  if(e.key==="Escape"){closeInfo();return}
+  trapInfoDialogFocus(e);
+  return;
+ }
+ if(e.key==="Escape"){accountOpen(false);cartPanel(false)}
+});
+async function handlePaymentReturn(){
+ const params=new URLSearchParams(location.search);
+ if(params.get("payment")!=="return")return;
+ const orderId=params.get("order");
+ cartPanel(true);
+ $("#message").textContent="Checking your payment with Pesepay…";
+ for(let attempt=0;attempt<8;attempt++){
+  try{
+   const result=await api("/api/payments/status?orderId="+encodeURIComponent(orderId));
+   if(result.status==="paid"){$("#message").textContent="Payment confirmed. Order #"+result.orderId+" is paid. Thank you for shopping STND.";history.replaceState({},"",location.pathname);return}
+   if(result.status==="payment_failed"){$("#message").textContent="Payment was not completed. Your order was not confirmed. You can try again.";history.replaceState({},"",location.pathname);return}
+   $("#message").textContent="Payment is still processing. Please wait…";
+  }catch(error){$("#message").textContent="We couldn't verify the payment yet. Refresh your orders in a moment."}
+  await new Promise(resolve=>setTimeout(resolve,2500));
+ }
+ $("#message").textContent="Your payment is still being confirmed. Check your account orders before trying again.";
+ history.replaceState({},"",location.pathname);
+}
+function prefillCheckout(user){if(!user)return;const f=$("#checkout");if(!f)return;if(user.name)f.elements.name.value=user.name;if(user.email)f.elements.email.value=user.email;if(user.phone)f.elements.phone.value=user.phone;if(user.address)f.elements.address.value=user.address} (async()=>{renderProducts();renderHomeProducts();loadProducts();try{currentUser=(await api("/api/auth/me")).user;$("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0];prefillCheckout(currentUser)}catch{}await handlePaymentReturn()})();
+
+async function loadProductReviews(id){const box=$("#productReviewList");if(!box)return;try{const d=await api("/api/products/"+id+"/reviews");box.innerHTML=d.reviews.length?d.reviews.map(r=>"<article class='review-card'><div class='review-card-top'><strong>"+esc(r.title||"Customer review")+"</strong><span>"+esc("★".repeat(r.rating))+"</span></div><p>"+esc(r.body)+"</p><small>"+esc(r.customer_name||"STND. customer")+(r.verified_purchase?" · Verified purchase":"")+"</small></article>").join(""):"<p>No customer reviews yet. Be the first to leave one.</p>"}catch(e){box.textContent="Reviews are temporarily unavailable."}}
+document.addEventListener("submit",async e=>{if(e.target.id!=="productReviewForm")return;e.preventDefault();const product=products.find(p=>p.name===$("#productInfoTitle").textContent);if(!product)return;const msg=$("#productReviewMessage");try{const d=await api("/api/products/"+product.id+"/reviews",{method:"POST",body:JSON.stringify(Object.fromEntries(new FormData(e.target).entries()))});msg.textContent=d.message;e.target.reset();await loadProductReviews(product.id);await loadProducts()}catch(err){msg.textContent=err.message}});
+</script>
+<script src="/clothing-rack.js" defer></script>
+</body></html>+money(p.price)+' · Stock: '+p.stock+' · '+(p.variants?.length?(p.variants.length+' colours / '+p.variants.reduce((n,c)=>n+c.sizes.length,0)+' sizes'):'Product stock')+' · '+(p.active?"Listed":"Not active")+' · '+(p.images?.length||1)+' photo(s)</small></div><div class="inventory-actions">'+(p.variants?.length?'<button data-edit="'+p.id+'">Manage variants</button>':'<button data-stock="-1" data-id="'+p.id+'">−</button><button data-stock="1" data-id="'+p.id+'">+ qty</button><button data-edit="'+p.id+'">Edit details</button>')+'<button data-delete="'+p.id+'">Archive</button></div></div>').join(""):'<div class="account-empty">No products yet. Add the first STND product.</div>';$("#inventoryList").onclick=inventoryAction;const orders=await api("/api/admin/orders");$("#sellerMetricSales").textContent="$"+money(orders.reduce((s,o)=>s+Number(o.unit_price)*Number(o.quantity),0));$("#sellerOrders").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+' · '+esc(o.product_name)+'</strong><small>'+esc(o.customer_name)+' · Qty '+o.quantity+'</small></div><b>$'+money(o.unit_price*o.quantity)+'</b></div>').join(""):"No orders for your products yet."}catch(e){$("#inventoryList").textContent=e.message}}
+async function inventoryAction(e){const b=e.target.closest("button");if(!b)return;const id=Number(b.dataset.id||b.dataset.edit||b.dataset.delete),p=sellerProducts.find(x=>x.id===id);if(!p)return;try{if(b.dataset.stock)await api("/api/admin/products/"+id,{method:"PATCH",body:JSON.stringify({stock:Math.max(0,p.stock+Number(b.dataset.stock))})});else if(b.dataset.delete){if(!confirm("Archive "+p.name+"? It will no longer appear in the storefront."))return;await api("/api/admin/products/"+id,{method:"DELETE"})}else if(b.dataset.edit){editProduct(p);return}await loadSeller();await loadProducts()}catch(err){alert(err.message)}}
+async function loadBuyerOrders(){try{const orders=await api("/api/orders");$("#buyerOrderList").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+'</strong><small>'+esc(o.status)+' · '+esc(o.created_at)+'</small></div><b>$'+money(o.total)+'</b></div>').join(""):"No orders yet."}catch(e){$("#buyerOrderList").textContent=e.message}}
+function initTermsNotice(){
+ const notice=$("#termsOverlay"),accept=$("#termsAccept");
+ if(!notice||!accept)return;
+ let accepted=false,isOpen=false,previousFocus=document.activeElement,previousOverflow=document.body.style.overflow;
+ let inertSnapshot=[];
+ try{accepted=localStorage.getItem("stndNoticeAccepted")==="yes"}catch{}
+ if(!accepted){
+  isOpen=true;
+  notice.classList.add("open");
+  notice.setAttribute("aria-hidden","false");
+  inertSnapshot=[...document.body.children].filter(node=>node!==notice).map(node=>[node,node.inert]);
+  inertSnapshot.forEach(([node])=>{node.inert=true});
+  document.body.style.overflow="hidden";
+  requestAnimationFrame(()=>accept.focus({preventScroll:true}));
+ }else{
+  notice.setAttribute("aria-hidden","true");
+ }
+ notice.addEventListener("keydown",e=>{
+  if(!isOpen||e.key!=="Tab")return;
+  const tabbable=[...notice.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>!el.hidden);
+  if(!tabbable.length){e.preventDefault();notice.querySelector(".terms-card")?.focus();return}
+  const first=tabbable[0],last=tabbable[tabbable.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+ });
+ accept.addEventListener("click",()=>{
+  if(!isOpen)return;
+  try{localStorage.setItem("stndNoticeAccepted","yes")}catch{}
+  isOpen=false;
+  notice.classList.remove("open");
+  notice.setAttribute("aria-hidden","true");
+  document.body.style.overflow=previousOverflow;
+  inertSnapshot.forEach(([node,wasInert])=>{node.inert=wasInert});
+  const target=previousFocus&&previousFocus!==document.body&&previousFocus.isConnected?previousFocus:$("#openAccount")||$(".brand");
+  target?.focus({preventScroll:true});
+ });
+}
+initTermsNotice();
+const policyContent={
+warranty:{title:"Warranty coverage",html:"<h3>Product-specific coverage</h3><p>Warranty coverage is not assumed to be the same for every item. Where a manufacturer or supplier warranty applies, its duration, covered faults and claim process should be stated on that product listing or supplied with the item.</p><h3>Before ordering</h3><p>If a listing does not state warranty coverage, contact STND. before placing an order to confirm what applies. Do not assume normal wear, accidental damage or misuse is covered.</p><p>This notice does not limit consumer rights that cannot legally be excluded. It is not a promise that every product carries a manufacturer warranty.</p>"},
+reviews:{title:"Customer reviews",html:"<p>See what customers are saying about the STND. collection. These sample reviews demonstrate how customer feedback will appear on the store.</p><div class=\"review-summary\"><div class=\"review-score\"><strong>4.9</strong><span>★★★★★</span><small>Sample rating</small></div><div class=\"review-bars\"><p><span>5 stars</span><span class=\"review-bar\"><i style=\"width:90%\"></i></span><b>90%</b></p><p><span>4 stars</span><span class=\"review-bar\"><i style=\"width:10%\"></i></span><b>10%</b></p></div></div><div class=\"review-list\"><article class=\"review-card\"><div class=\"review-card-top\"><strong>Everyday Essential</strong><span>★★★★★</span></div><p>Clean design, comfortable fit and easy to style. The kind of piece you keep reaching for.</p><small>Sample customer review · Clothing</small></article><article class=\"review-card\"><div class=\"review-card-top\"><strong>Great finishing</strong><span>★★★★★</span></div><p>The details make the difference. Simple, versatile and works with just about everything.</p><small>Sample customer review · Accessories</small></article><article class=\"review-card\"><div class=\"review-card-top\"><strong>Would recommend</strong><span>★★★★☆</span></div><p>Good everyday style without overcomplicating it. Looking forward to seeing more pieces.</p><small>Sample customer review · Footwear</small></article></div>"},
+privacy:{title:"Privacy policy",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Information collected</h3><p>When you create an account, the store processes your name, email address and password, which is stored as a password hash. At checkout, it processes the name, email address and delivery address you submit, together with order details.</p><h3>How information is used</h3><p>Information is used to operate accounts, process and communicate about orders, provide support, prevent misuse and maintain store security.</p><h3>Payments</h3><p>Payments are handled through Pesepay hosted checkout when available. Do not enter card or mobile-money credentials into STND. forms. Payment-provider data is handled under that provider's own privacy terms.</p><h3>Sharing and retention</h3><p>Information may be processed by service providers that host or operate the store. It is retained as needed for account, order, legal and security purposes. STND. does not claim to sell personal information.</p><h3>Your choices</h3><p>For access, correction or deletion requests, contact STND. through its official store contact channel. Some order or security records may need to be retained where required by law.</p>"},
+terms:{title:"Terms and conditions",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Using the store</h3><p>Use the storefront lawfully and provide accurate account, delivery and checkout information.</p><h3>Products, prices and availability</h3><p>Descriptions, images, prices and stock are provided for guidance and may be corrected or updated. Screen settings can affect colours. An item in your bag is not reserved until an order is accepted.</p><h3>Orders and payment</h3><p>Submitting checkout starts an order and payment process. An order is treated as paid only after the payment provider confirms a successful transaction. A redirect or reference number alone is not proof of payment. If payment fails or remains pending, do not assume the order is confirmed.</p><h3>Returns and consumer rights</h3><p>Any return, exchange or refund arrangement must be confirmed with STND. These terms do not remove consumer rights that apply under relevant law.</p><h3>Changes</h3><p>Store content and these terms may be updated. The version displayed here applies when you use the storefront.</p>"},
+cookies:{title:"Cookie policy",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Essential cookies</h3><p>STND. uses a session cookie to keep a signed-in account working and support secure account actions. This cookie is necessary for core account functionality.</p><h3>Other tracking</h3><p>The storefront is not intended to use advertising cookies or cross-site tracking cookies. Third-party services, including hosted payment pages, may apply their own cookies under their own policies.</p><h3>Managing cookies</h3><p>You can block or clear cookies in browser settings. If you block essential cookies, sign-in and account features may not work correctly.</p>"}
+};
+function openInfoDialog(selector,trigger){
+ const dialog=$(selector);
+ if(!dialog)return;
+ if(activeInfoDialog)closeInfo(false);
+ infoDialogOpener=trigger||document.activeElement;
+ activeInfoDialog=dialog;
+ infoDialogOverflow=document.body.style.overflow;
+ infoDialogInert=[...document.body.children].filter(node=>node!==dialog).map(node=>[node,node.inert]);
+ infoDialogInert.forEach(([node])=>{node.inert=true});
+ document.body.style.overflow="hidden";
+ dialog.setAttribute("aria-hidden","false");
+ dialog.classList.add("open");
+ requestAnimationFrame(()=>{const target=dialog.querySelector("[data-close-info]")||dialog.querySelector(".info-panel");target?.focus({preventScroll:true})});
+}
+function closeInfo(restoreFocus=true){
+ if(!activeInfoDialog)return;
+ const closing=activeInfoDialog;
+ closing.classList.remove("open");
+ closing.setAttribute("aria-hidden","true");
+ activeInfoDialog=null;
+ document.body.style.overflow=infoDialogOverflow;
+ infoDialogInert.forEach(([node,wasInert])=>{node.inert=wasInert});
+ infoDialogInert=[];
+ const target=infoDialogOpener;
+ infoDialogOpener=null;
+ if(restoreFocus&&target&&target.isConnected&&!target.inert)target.focus({preventScroll:true});
+}
+function trapInfoDialogFocus(e){
+ if(!activeInfoDialog||e.key!=="Tab")return;
+ const tabbable=[...activeInfoDialog.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>!el.hidden);
+ if(!tabbable.length){e.preventDefault();activeInfoDialog.querySelector(".info-panel")?.focus();return}
+ const first=tabbable[0],last=tabbable[tabbable.length-1];
+ if(e.shiftKey&&(document.activeElement===first||!activeInfoDialog.contains(document.activeElement))){e.preventDefault();last.focus()}
+ else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+}
+function openPolicy(key,trigger){const page=policyContent[key];if(!page)return;$("#policyTitle").textContent=page.title;$("#policyBody").innerHTML=page.html;openInfoDialog("#policyInfo",trigger)}
+function openProductInfo(id,trigger){const p=products.find(x=>Number(x.id)===Number(id));if(!p)return;$("#productInfoTitle").textContent=p.name;$("#productInfoBody").innerHTML=(p.images?.length?p.images:[p.image]).filter(Boolean).map(u=>"<img class='info-gallery-image' src='"+esc(u)+"' alt='"+esc(p.name)+"' loading='lazy'>").join("")+"<p>"+esc(p.description||"No additional description has been provided for this product.")+"</p><p class='info-product-price'>$"+money(p.price)+"</p><h3>Product details</h3><p>Category: "+esc(p.category||"Not specified")+". Availability: "+Number(p.stock||0)+" currently listed.</p><h3>Care and warranty</h3><p>Follow any care instructions supplied with the item. Warranty coverage is product-specific and is only included where stated on the product listing or supplied by the manufacturer or supplier. Contact STND. before ordering if you need confirmation.</p><h3>Customer reviews</h3><div id='productReviewList'>Loading reviews…</div><form id='productReviewForm' class='review-form'><label>Rating <select name='rating' required><option value=''>Choose a rating</option><option value='5'>★★★★★</option><option value='4'>★★★★</option><option value='3'>★★★</option><option value='2'>★★</option><option value='1'>★</option></select></label><input name='title' maxlength='100' placeholder='Review title (optional)'><textarea name='body' maxlength='1500' required placeholder='Share your experience…'></textarea><div class='review-form-actions'><button class='button-red' type='submit'>Submit review</button><small id='productReviewMessage'>Sign in to submit a review.</small></div></form><div class='info-actions'><button class='button-red' type='button' data-add-from-details='"+p.id+"'>Add to bag +</button></div>";openInfoDialog("#productInfo",trigger);loadProductReviews(id)}
+document.addEventListener("click",e=>{
+ const policy=e.target.closest("[data-policy]");if(policy){e.preventDefault();openPolicy(policy.dataset.policy,policy);return}
+ const detail=e.target.closest("[data-view-product]");if(detail){openProductInfo(detail.dataset.viewProduct,detail);return}
+ const addDetail=e.target.closest("[data-add-from-details]");if(addDetail){const p=products.find(x=>Number(x.id)===Number(addDetail.dataset.addFromDetails));if(!p)return;const item=cart.find(x=>x.id===p.id);if(item){if(item.quantity>=p.stock){$("#message").textContent="You've reached the available stock.";return}item.quantity++}else cart.push({id:p.id,quantity:1});renderCart();$("#message").textContent="Added to your bag.";closeInfo();return}
+ if(e.target.closest("[data-close-info]")||e.target.classList.contains("info-overlay"))closeInfo();
+});
+$("#menuToggle").onclick=()=>$("#navlinks").classList.toggle("open");
+document.addEventListener("keydown",e=>{
+ if(activeInfoDialog){
+  if(e.key==="Escape"){closeInfo();return}
+  trapInfoDialogFocus(e);
+  return;
+ }
+ if(e.key==="Escape"){accountOpen(false);cartPanel(false)}
+});
+async function handlePaymentReturn(){
+ const params=new URLSearchParams(location.search);
+ if(params.get("payment")!=="return")return;
+ const orderId=params.get("order");
+ cartPanel(true);
+ $("#message").textContent="Checking your payment with Pesepay…";
+ for(let attempt=0;attempt<8;attempt++){
+  try{
+   const result=await api("/api/payments/status?orderId="+encodeURIComponent(orderId));
+   if(result.status==="paid"){$("#message").textContent="Payment confirmed. Order #"+result.orderId+" is paid. Thank you for shopping STND.";history.replaceState({},"",location.pathname);return}
+   if(result.status==="payment_failed"){$("#message").textContent="Payment was not completed. Your order was not confirmed. You can try again.";history.replaceState({},"",location.pathname);return}
+   $("#message").textContent="Payment is still processing. Please wait…";
+  }catch(error){$("#message").textContent="We couldn't verify the payment yet. Refresh your orders in a moment."}
+  await new Promise(resolve=>setTimeout(resolve,2500));
+ }
+ $("#message").textContent="Your payment is still being confirmed. Check your account orders before trying again.";
+ history.replaceState({},"",location.pathname);
+}
+function prefillCheckout(user){if(!user)return;const f=$("#checkout");if(!f)return;if(user.name)f.elements.name.value=user.name;if(user.email)f.elements.email.value=user.email;if(user.phone)f.elements.phone.value=user.phone;if(user.address)f.elements.address.value=user.address} (async()=>{renderProducts();renderHomeProducts();loadProducts();try{currentUser=(await api("/api/auth/me")).user;$("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0];prefillCheckout(currentUser)}catch{}await handlePaymentReturn()})();
+
+async function loadProductReviews(id){const box=$("#productReviewList");if(!box)return;try{const d=await api("/api/products/"+id+"/reviews");box.innerHTML=d.reviews.length?d.reviews.map(r=>"<article class='review-card'><div class='review-card-top'><strong>"+esc(r.title||"Customer review")+"</strong><span>"+esc("★".repeat(r.rating))+"</span></div><p>"+esc(r.body)+"</p><small>"+esc(r.customer_name||"STND. customer")+(r.verified_purchase?" · Verified purchase":"")+"</small></article>").join(""):"<p>No customer reviews yet. Be the first to leave one.</p>"}catch(e){box.textContent="Reviews are temporarily unavailable."}}
+document.addEventListener("submit",async e=>{if(e.target.id!=="productReviewForm")return;e.preventDefault();const product=products.find(p=>p.name===$("#productInfoTitle").textContent);if(!product)return;const msg=$("#productReviewMessage");try{const d=await api("/api/products/"+product.id+"/reviews",{method:"POST",body:JSON.stringify(Object.fromEntries(new FormData(e.target).entries()))});msg.textContent=d.message;e.target.reset();await loadProductReviews(product.id);await loadProducts()}catch(err){msg.textContent=err.message}});
+</script>
+<script src="/clothing-rack.js" defer></script>
+</body></html>+money(o.unit_price*o.quantity)+'</b></div>').join(""):"No orders for your products yet."}catch(e){$("#inventoryList").textContent=e.message}}
+async function inventoryAction(e){const b=e.target.closest("button");if(!b)return;const id=Number(b.dataset.id||b.dataset.edit||b.dataset.delete),p=sellerProducts.find(x=>x.id===id);if(!p)return;try{if(b.dataset.stock)await api("/api/admin/products/"+id,{method:"PATCH",body:JSON.stringify({stock:Math.max(0,p.stock+Number(b.dataset.stock))})});else if(b.dataset.delete){if(!confirm("Archive "+p.name+"? It will no longer appear in the storefront."))return;await api("/api/admin/products/"+id,{method:"DELETE"})}else if(b.dataset.edit){editProduct(p);return}await loadSeller();await loadProducts()}catch(err){alert(err.message)}}
+async function loadBuyerOrders(){try{const orders=await api("/api/orders");$("#buyerOrderList").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+'</strong><small>'+esc(o.status)+' · '+esc(o.created_at)+'</small></div><b>$'+money(o.total)+'</b></div>').join(""):"No orders yet."}catch(e){$("#buyerOrderList").textContent=e.message}}
+function initTermsNotice(){
+ const notice=$("#termsOverlay"),accept=$("#termsAccept");
+ if(!notice||!accept)return;
+ let accepted=false,isOpen=false,previousFocus=document.activeElement,previousOverflow=document.body.style.overflow;
+ let inertSnapshot=[];
+ try{accepted=localStorage.getItem("stndNoticeAccepted")==="yes"}catch{}
+ if(!accepted){
+  isOpen=true;
+  notice.classList.add("open");
+  notice.setAttribute("aria-hidden","false");
+  inertSnapshot=[...document.body.children].filter(node=>node!==notice).map(node=>[node,node.inert]);
+  inertSnapshot.forEach(([node])=>{node.inert=true});
+  document.body.style.overflow="hidden";
+  requestAnimationFrame(()=>accept.focus({preventScroll:true}));
+ }else{
+  notice.setAttribute("aria-hidden","true");
+ }
+ notice.addEventListener("keydown",e=>{
+  if(!isOpen||e.key!=="Tab")return;
+  const tabbable=[...notice.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>!el.hidden);
+  if(!tabbable.length){e.preventDefault();notice.querySelector(".terms-card")?.focus();return}
+  const first=tabbable[0],last=tabbable[tabbable.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+ });
+ accept.addEventListener("click",()=>{
+  if(!isOpen)return;
+  try{localStorage.setItem("stndNoticeAccepted","yes")}catch{}
+  isOpen=false;
+  notice.classList.remove("open");
+  notice.setAttribute("aria-hidden","true");
+  document.body.style.overflow=previousOverflow;
+  inertSnapshot.forEach(([node,wasInert])=>{node.inert=wasInert});
+  const target=previousFocus&&previousFocus!==document.body&&previousFocus.isConnected?previousFocus:$("#openAccount")||$(".brand");
+  target?.focus({preventScroll:true});
+ });
+}
+initTermsNotice();
+const policyContent={
+warranty:{title:"Warranty coverage",html:"<h3>Product-specific coverage</h3><p>Warranty coverage is not assumed to be the same for every item. Where a manufacturer or supplier warranty applies, its duration, covered faults and claim process should be stated on that product listing or supplied with the item.</p><h3>Before ordering</h3><p>If a listing does not state warranty coverage, contact STND. before placing an order to confirm what applies. Do not assume normal wear, accidental damage or misuse is covered.</p><p>This notice does not limit consumer rights that cannot legally be excluded. It is not a promise that every product carries a manufacturer warranty.</p>"},
+reviews:{title:"Customer reviews",html:"<p>See what customers are saying about the STND. collection. These sample reviews demonstrate how customer feedback will appear on the store.</p><div class=\"review-summary\"><div class=\"review-score\"><strong>4.9</strong><span>★★★★★</span><small>Sample rating</small></div><div class=\"review-bars\"><p><span>5 stars</span><span class=\"review-bar\"><i style=\"width:90%\"></i></span><b>90%</b></p><p><span>4 stars</span><span class=\"review-bar\"><i style=\"width:10%\"></i></span><b>10%</b></p></div></div><div class=\"review-list\"><article class=\"review-card\"><div class=\"review-card-top\"><strong>Everyday Essential</strong><span>★★★★★</span></div><p>Clean design, comfortable fit and easy to style. The kind of piece you keep reaching for.</p><small>Sample customer review · Clothing</small></article><article class=\"review-card\"><div class=\"review-card-top\"><strong>Great finishing</strong><span>★★★★★</span></div><p>The details make the difference. Simple, versatile and works with just about everything.</p><small>Sample customer review · Accessories</small></article><article class=\"review-card\"><div class=\"review-card-top\"><strong>Would recommend</strong><span>★★★★☆</span></div><p>Good everyday style without overcomplicating it. Looking forward to seeing more pieces.</p><small>Sample customer review · Footwear</small></article></div>"},
+privacy:{title:"Privacy policy",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Information collected</h3><p>When you create an account, the store processes your name, email address and password, which is stored as a password hash. At checkout, it processes the name, email address and delivery address you submit, together with order details.</p><h3>How information is used</h3><p>Information is used to operate accounts, process and communicate about orders, provide support, prevent misuse and maintain store security.</p><h3>Payments</h3><p>Payments are handled through Pesepay hosted checkout when available. Do not enter card or mobile-money credentials into STND. forms. Payment-provider data is handled under that provider's own privacy terms.</p><h3>Sharing and retention</h3><p>Information may be processed by service providers that host or operate the store. It is retained as needed for account, order, legal and security purposes. STND. does not claim to sell personal information.</p><h3>Your choices</h3><p>For access, correction or deletion requests, contact STND. through its official store contact channel. Some order or security records may need to be retained where required by law.</p>"},
+terms:{title:"Terms and conditions",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Using the store</h3><p>Use the storefront lawfully and provide accurate account, delivery and checkout information.</p><h3>Products, prices and availability</h3><p>Descriptions, images, prices and stock are provided for guidance and may be corrected or updated. Screen settings can affect colours. An item in your bag is not reserved until an order is accepted.</p><h3>Orders and payment</h3><p>Submitting checkout starts an order and payment process. An order is treated as paid only after the payment provider confirms a successful transaction. A redirect or reference number alone is not proof of payment. If payment fails or remains pending, do not assume the order is confirmed.</p><h3>Returns and consumer rights</h3><p>Any return, exchange or refund arrangement must be confirmed with STND. These terms do not remove consumer rights that apply under relevant law.</p><h3>Changes</h3><p>Store content and these terms may be updated. The version displayed here applies when you use the storefront.</p>"},
+cookies:{title:"Cookie policy",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Essential cookies</h3><p>STND. uses a session cookie to keep a signed-in account working and support secure account actions. This cookie is necessary for core account functionality.</p><h3>Other tracking</h3><p>The storefront is not intended to use advertising cookies or cross-site tracking cookies. Third-party services, including hosted payment pages, may apply their own cookies under their own policies.</p><h3>Managing cookies</h3><p>You can block or clear cookies in browser settings. If you block essential cookies, sign-in and account features may not work correctly.</p>"}
+};
+function openInfoDialog(selector,trigger){
+ const dialog=$(selector);
+ if(!dialog)return;
+ if(activeInfoDialog)closeInfo(false);
+ infoDialogOpener=trigger||document.activeElement;
+ activeInfoDialog=dialog;
+ infoDialogOverflow=document.body.style.overflow;
+ infoDialogInert=[...document.body.children].filter(node=>node!==dialog).map(node=>[node,node.inert]);
+ infoDialogInert.forEach(([node])=>{node.inert=true});
+ document.body.style.overflow="hidden";
+ dialog.setAttribute("aria-hidden","false");
+ dialog.classList.add("open");
+ requestAnimationFrame(()=>{const target=dialog.querySelector("[data-close-info]")||dialog.querySelector(".info-panel");target?.focus({preventScroll:true})});
+}
+function closeInfo(restoreFocus=true){
+ if(!activeInfoDialog)return;
+ const closing=activeInfoDialog;
+ closing.classList.remove("open");
+ closing.setAttribute("aria-hidden","true");
+ activeInfoDialog=null;
+ document.body.style.overflow=infoDialogOverflow;
+ infoDialogInert.forEach(([node,wasInert])=>{node.inert=wasInert});
+ infoDialogInert=[];
+ const target=infoDialogOpener;
+ infoDialogOpener=null;
+ if(restoreFocus&&target&&target.isConnected&&!target.inert)target.focus({preventScroll:true});
+}
+function trapInfoDialogFocus(e){
+ if(!activeInfoDialog||e.key!=="Tab")return;
+ const tabbable=[...activeInfoDialog.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>!el.hidden);
+ if(!tabbable.length){e.preventDefault();activeInfoDialog.querySelector(".info-panel")?.focus();return}
+ const first=tabbable[0],last=tabbable[tabbable.length-1];
+ if(e.shiftKey&&(document.activeElement===first||!activeInfoDialog.contains(document.activeElement))){e.preventDefault();last.focus()}
+ else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+}
+function openPolicy(key,trigger){const page=policyContent[key];if(!page)return;$("#policyTitle").textContent=page.title;$("#policyBody").innerHTML=page.html;openInfoDialog("#policyInfo",trigger)}
+function openProductInfo(id,trigger){const p=products.find(x=>Number(x.id)===Number(id));if(!p)return;$("#productInfoTitle").textContent=p.name;$("#productInfoBody").innerHTML=(p.images?.length?p.images:[p.image]).filter(Boolean).map(u=>"<img class='info-gallery-image' src='"+esc(u)+"' alt='"+esc(p.name)+"' loading='lazy'>").join("")+"<p>"+esc(p.description||"No additional description has been provided for this product.")+"</p><p class='info-product-price'>$"+money(p.price)+"</p><h3>Product details</h3><p>Category: "+esc(p.category||"Not specified")+". Availability: "+Number(p.stock||0)+" currently listed.</p><h3>Care and warranty</h3><p>Follow any care instructions supplied with the item. Warranty coverage is product-specific and is only included where stated on the product listing or supplied by the manufacturer or supplier. Contact STND. before ordering if you need confirmation.</p><h3>Customer reviews</h3><div id='productReviewList'>Loading reviews…</div><form id='productReviewForm' class='review-form'><label>Rating <select name='rating' required><option value=''>Choose a rating</option><option value='5'>★★★★★</option><option value='4'>★★★★</option><option value='3'>★★★</option><option value='2'>★★</option><option value='1'>★</option></select></label><input name='title' maxlength='100' placeholder='Review title (optional)'><textarea name='body' maxlength='1500' required placeholder='Share your experience…'></textarea><div class='review-form-actions'><button class='button-red' type='submit'>Submit review</button><small id='productReviewMessage'>Sign in to submit a review.</small></div></form><div class='info-actions'><button class='button-red' type='button' data-add-from-details='"+p.id+"'>Add to bag +</button></div>";openInfoDialog("#productInfo",trigger);loadProductReviews(id)}
+document.addEventListener("click",e=>{
+ const policy=e.target.closest("[data-policy]");if(policy){e.preventDefault();openPolicy(policy.dataset.policy,policy);return}
+ const detail=e.target.closest("[data-view-product]");if(detail){openProductInfo(detail.dataset.viewProduct,detail);return}
+ const addDetail=e.target.closest("[data-add-from-details]");if(addDetail){const p=products.find(x=>Number(x.id)===Number(addDetail.dataset.addFromDetails));if(!p)return;const item=cart.find(x=>x.id===p.id);if(item){if(item.quantity>=p.stock){$("#message").textContent="You've reached the available stock.";return}item.quantity++}else cart.push({id:p.id,quantity:1});renderCart();$("#message").textContent="Added to your bag.";closeInfo();return}
+ if(e.target.closest("[data-close-info]")||e.target.classList.contains("info-overlay"))closeInfo();
+});
+$("#menuToggle").onclick=()=>$("#navlinks").classList.toggle("open");
+document.addEventListener("keydown",e=>{
+ if(activeInfoDialog){
+  if(e.key==="Escape"){closeInfo();return}
+  trapInfoDialogFocus(e);
+  return;
+ }
+ if(e.key==="Escape"){accountOpen(false);cartPanel(false)}
+});
+async function handlePaymentReturn(){
+ const params=new URLSearchParams(location.search);
+ if(params.get("payment")!=="return")return;
+ const orderId=params.get("order");
+ cartPanel(true);
+ $("#message").textContent="Checking your payment with Pesepay…";
+ for(let attempt=0;attempt<8;attempt++){
+  try{
+   const result=await api("/api/payments/status?orderId="+encodeURIComponent(orderId));
+   if(result.status==="paid"){$("#message").textContent="Payment confirmed. Order #"+result.orderId+" is paid. Thank you for shopping STND.";history.replaceState({},"",location.pathname);return}
+   if(result.status==="payment_failed"){$("#message").textContent="Payment was not completed. Your order was not confirmed. You can try again.";history.replaceState({},"",location.pathname);return}
+   $("#message").textContent="Payment is still processing. Please wait…";
+  }catch(error){$("#message").textContent="We couldn't verify the payment yet. Refresh your orders in a moment."}
+  await new Promise(resolve=>setTimeout(resolve,2500));
+ }
+ $("#message").textContent="Your payment is still being confirmed. Check your account orders before trying again.";
+ history.replaceState({},"",location.pathname);
+}
+function prefillCheckout(user){if(!user)return;const f=$("#checkout");if(!f)return;if(user.name)f.elements.name.value=user.name;if(user.email)f.elements.email.value=user.email;if(user.phone)f.elements.phone.value=user.phone;if(user.address)f.elements.address.value=user.address} (async()=>{renderProducts();renderHomeProducts();loadProducts();try{currentUser=(await api("/api/auth/me")).user;$("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0];prefillCheckout(currentUser)}catch{}await handlePaymentReturn()})();
+
+async function loadProductReviews(id){const box=$("#productReviewList");if(!box)return;try{const d=await api("/api/products/"+id+"/reviews");box.innerHTML=d.reviews.length?d.reviews.map(r=>"<article class='review-card'><div class='review-card-top'><strong>"+esc(r.title||"Customer review")+"</strong><span>"+esc("★".repeat(r.rating))+"</span></div><p>"+esc(r.body)+"</p><small>"+esc(r.customer_name||"STND. customer")+(r.verified_purchase?" · Verified purchase":"")+"</small></article>").join(""):"<p>No customer reviews yet. Be the first to leave one.</p>"}catch(e){box.textContent="Reviews are temporarily unavailable."}}
+document.addEventListener("submit",async e=>{if(e.target.id!=="productReviewForm")return;e.preventDefault();const product=products.find(p=>p.name===$("#productInfoTitle").textContent);if(!product)return;const msg=$("#productReviewMessage");try{const d=await api("/api/products/"+product.id+"/reviews",{method:"POST",body:JSON.stringify(Object.fromEntries(new FormData(e.target).entries()))});msg.textContent=d.message;e.target.reset();await loadProductReviews(product.id);await loadProducts()}catch(err){msg.textContent=err.message}});
+</script>
+<script src="/clothing-rack.js" defer></script>
+</body></html>+money(p.price)+' · Stock: '+p.stock+' · '+(p.variants?.length?(p.variants.length+' colours / '+p.variants.reduce((n,c)=>n+c.sizes.length,0)+' sizes'):'Product stock')+' · '+(p.active?"Listed":"Not active")+' · '+(p.images?.length||1)+' photo(s)</small></div><div class="inventory-actions">'+(p.variants?.length?'<button data-edit="'+p.id+'">Manage variants</button>':'<button data-stock="-1" data-id="'+p.id+'">−</button><button data-stock="1" data-id="'+p.id+'">+ qty</button><button data-edit="'+p.id+'">Edit details</button>')+'<button data-delete="'+p.id+'">Archive</button></div></div>').join(""):'<div class="account-empty">No products yet. Add the first STND product.</div>';$("#inventoryList").onclick=inventoryAction;const orders=await api("/api/admin/orders");$("#sellerMetricSales").textContent="$"+money(orders.reduce((s,o)=>s+Number(o.unit_price)*Number(o.quantity),0));$("#sellerOrders").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+' · '+esc(o.product_name)+'</strong><small>'+esc(o.customer_name)+' · Qty '+o.quantity+'</small></div><b>$'+money(o.unit_price*o.quantity)+'</b></div>').join(""):"No orders for your products yet."}catch(e){$("#inventoryList").textContent=e.message}}
 async function inventoryAction(e){const b=e.target.closest("button");if(!b)return;const id=Number(b.dataset.id||b.dataset.edit||b.dataset.delete),p=sellerProducts.find(x=>x.id===id);if(!p)return;try{if(b.dataset.stock)await api("/api/admin/products/"+id,{method:"PATCH",body:JSON.stringify({stock:Math.max(0,p.stock+Number(b.dataset.stock))})});else if(b.dataset.delete){if(!confirm("Archive "+p.name+"? It will no longer appear in the storefront."))return;await api("/api/admin/products/"+id,{method:"DELETE"})}else if(b.dataset.edit){editProduct(p);return}await loadSeller();await loadProducts()}catch(err){alert(err.message)}}
 async function loadBuyerOrders(){try{const orders=await api("/api/orders");$("#buyerOrderList").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+'</strong><small>'+esc(o.status)+' · '+esc(o.created_at)+'</small></div><b>$'+money(o.total)+'</b></div>').join(""):"No orders yet."}catch(e){$("#buyerOrderList").textContent=e.message}}
 function initTermsNotice(){
