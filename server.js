@@ -34,6 +34,7 @@ const validEmail = v => typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.te
 const hash = v => crypto.createHash("sha256").update(v).digest("hex");
 const cleanUser = u => u && ({ id:Number(u.id), name:u.name, email:u.email, role:u.role, createdAt:u.created_at, address:u.address || "", phone:u.phone || "" });
 const cleanProduct = p => ({ ...p, images:Array.isArray(p.images)?p.images:(p.image?[p.image]:[]), id:Number(p.id), price:Number(p.price), stock:Number(p.stock), featured:Boolean(p.featured), active:p.status === "active" });
+const isHttpUrl = value => { if(typeof value !== "string") return false; try { const parsed = new URL(value); return parsed.protocol === "http:" || parsed.protocol === "https:"; } catch { return false; } };
 async function getVariantsForProducts(productIds, client=pool) {
   const ids=[...new Set((productIds||[]).map(Number).filter(Number.isSafeInteger))];
   if(!ids.length)return new Map();
@@ -180,8 +181,8 @@ app.get("/api/auth/me",auth,(req,res)=>res.json({user:cleanUser(req.user)}));
 
 app.get("/api/products",asyncRoute(async(req,res)=>{const r=await pool.query("select p.id,p.name,p.description,p.price,p.image,p.images,p.slug,p.sku,p.category,p.audience,p.stock,p.status,p.featured,p.created_at,coalesce(rv.average_rating,0)::numeric(3,2) as average_rating,coalesce(rv.review_count,0)::int as review_count,coalesce(sales.popularity,0)::int as popularity from public.products p left join (select product_id,round(avg(rating)::numeric,2) as average_rating,count(*) as review_count from public.product_reviews group by product_id) rv on rv.product_id=p.id left join (select oi.product_id,sum(oi.quantity) as popularity from public.order_items oi join public.orders o on o.id=oi.order_id where o.payment_status='paid' group by oi.product_id) sales on sales.product_id=p.id where p.status='active' and p.stock>0 order by p.featured desc,p.created_at desc,p.id desc");const variants=await getVariantsForProducts(r.rows.map(x=>x.id));res.json(r.rows.map(p=>{
  const productVariants=variants.get(Number(p.id))||[];
- const variantImages=productVariants.flatMap(colour=>[colour.frontImage,colour.backImage]).filter(url=>typeof url==="string"&&/^https?:\\/\\//i.test(url.trim()));
- const images=[...new Set([...(Array.isArray(p.images)?p.images:(p.image?[p.image]:[])),...variantImages].filter(url=>typeof url==="string"&&/^https?:\\/\\//i.test(url.trim())))];
+ const variantImages=productVariants.flatMap(colour=>[colour.frontImage,colour.backImage]).filter(isHttpUrl);
+ const images=[...new Set([...(Array.isArray(p.images)?p.images:(p.image?[p.image]:[])),...variantImages].filter(isHttpUrl))];
  return {...cleanProduct({...p,image:p.image||images[0]||null,images}),variants:productVariants};
 })));}));
 
