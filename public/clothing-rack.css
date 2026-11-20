@@ -21,3 +21,5 @@
 .rack-single-category,.rack-single-description{font-size:12px;line-height:1.8;color:#777}
 .rack-single-note{font-size:9px;line-height:1.6;color:#888;margin-top:14px}
 @media(max-width:760px){.rack-single-experience{grid-template-columns:1fr;gap:18px;padding:10px;margin-left:-2px;margin-right:-2px}.rack-single-stage{height:min(52vh,420px);min-height:320px}.rack-single-panel{padding:0 7px 10px}.rack-single-panel h3{font-size:38px}.info-panel:has(.rack-single-experience){width:100%;max-height:96dvh;padding:18px}}
+
+.product-image-empty{position:absolute;inset:0;display:grid;place-items:center;padding:20px;text-align:center;background:linear-gradient(145deg,#e8e7e2,#d8d7d1);color:#777;font-size:9px;letter-spacing:.18em;text-transform:uppercase}.product-image.image-unavailable{background:#e8e7e2}
