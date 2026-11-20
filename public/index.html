@@ -17,9 +17,25 @@
 @media(max-width:620px){.nav{height:66px}.brand{font-size:31px}.navlinks{display:none;position:absolute;top:66px;left:0;right:0;padding:18px;background:var(--paper);border-bottom:1px solid var(--line);flex-direction:column;align-items:flex-start}.navlinks.open{display:flex}.menu-toggle{display:block}.navright{gap:12px}.nav-action{font-size:9px}.hero{grid-template-columns:1fr}.hero-copy{padding:58px 24px 42px}.hero h1{font-size:76px}.hero-image{min-height:390px}.section-head{align-items:flex-start;flex-direction:column}.section-head p{max-width:360px}.categories{grid-template-columns:1fr 1fr}.category-card{min-height:260px}.category-card:last-child{grid-column:1/-1;min-height:230px}.new-drop{grid-template-columns:1fr}.drop-image{min-height:300px;grid-row:1}.drop-copy{padding:38px 25px}.products{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 11px}.shop-tools{top:66px}.footer{flex-direction:column}.footer-links{flex-wrap:wrap}.seller-overview{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:390px){.navright{gap:8px}.nav-action{font-size:8px;letter-spacing:.05em}.hero h1{font-size:64px}.category-card{min-height:220px}.category-copy{left:14px;bottom:15px}.category-copy strong{font-size:29px}.product-meta{flex-direction:column}.price{order:-1}.search-sort{flex-direction:column}.sort{min-height:42px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* STND. opening sequence + editorial motion */
+.intro-screen{position:fixed;inset:0;z-index:1000;background:#f7f7f5;color:#d71920;display:grid;place-items:center;overflow:hidden}
+.intro-inner{width:min(88vw,1100px);display:flex;flex-direction:column;align-items:center;gap:18px}
+.intro-kicker,.intro-foot{font-size:9px;letter-spacing:.28em;text-transform:uppercase;font-weight:700;color:#111}
+.intro-word{display:flex;overflow:hidden;font:900 clamp(100px,24vw,310px)/.72 var(--display);letter-spacing:-.075em}
+.intro-letter{display:inline-block;transform:translateY(120%);opacity:0}
+.intro-period{color:#111}
+.intro-rule{height:3px;width:0;background:#d71920;margin-top:18px}
+.intro-foot{opacity:0;letter-spacing:.22em}
+.js-motion [data-reveal]{opacity:0;transform:translateY(38px)}
+.js-motion .hero-copy>*{will-change:transform,opacity}
+.hero-image img,.drop-image img,.category-card img{will-change:transform}
+@media(prefers-reduced-motion:reduce){.intro-screen{display:none!important}.js-motion [data-reveal]{opacity:1!important;transform:none!important}}
 </style>
 </head>
 <body>
+<div class="intro-screen" id="introScreen" aria-label="STND. Beyond the standard"><div class="intro-inner"><div class="intro-kicker">A new point of view</div><div class="intro-word" aria-label="STND"><span class="intro-letter">S</span><span class="intro-letter">T</span><span class="intro-letter">N</span><span class="intro-letter">D</span><span class="intro-letter intro-period">.</span></div><div class="intro-rule"></div><div class="intro-foot">BEYOND THE STANDARD · COLLECTION 001</div></div></div>
+
 <div class="announcement">Complimentary delivery on orders over $150 · The STND. collection 001</div>
 <header class="nav"><a class="brand" href="#" aria-label="STND home">STND<span>.</span></a><nav class="navlinks" id="navlinks"><a href="#shop" data-open-shop="all">Shop all</a><a href="#shop" data-open-shop="Men">Men</a><a href="#shop" data-open-shop="Women">Women</a><a href="#collections">Collections</a><a href="#footer">Our world</a></nav><div class="navright"><button class="nav-action" id="openAccount">Account ↗</button><button class="nav-action" id="openCart">Bag <span class="bag-count" id="count">0</span></button><button class="menu-toggle" id="menuToggle" aria-label="Open navigation">☰</button></div></header>
 <main id="home">
@@ -38,7 +54,35 @@
 <footer class="footer" id="footer"><div><div class="footer-brand">STND<span>.</span></div><p>Beyond the standard.</p></div><div class="footer-links"><a href="#shop" data-open-shop="all">Shop</a><a href="#collections">Collections</a><a href="#footer">Contact</a><a href="#footer">Privacy</a><a href="#footer">Terms</a></div><span>© 2026 STND. All rights reserved.</span></footer>
 <div class="backdrop" id="backdrop"></div><aside class="cart-panel" id="cartPanel" aria-label="Shopping bag"><div class="cart-top"><h2>Your bag</h2><button class="close" id="closeCart" aria-label="Close bag">×</button></div><div class="cart-items" id="items">Your bag is empty.</div><div class="cart-total"><div class="total-line"><span>Subtotal</span><strong>$<span id="total">0.00</span></strong></div><form class="checkout" id="checkout"><input name="name" placeholder="Full name" required><input name="email" type="email" placeholder="Email address" required><input name="address" placeholder="Delivery address" required><button class="button-red">Place order <span>→</span></button></form><p class="notice" id="message">Checkout records your order. Online payments are not yet enabled.</p></div></aside>
 <div class="account-backdrop" id="accountBackdrop"><section class="account-modal" role="dialog" aria-modal="true"><div class="account-head"><div><p class="eyebrow">STND. / YOUR ACCOUNT</p><h2>Your account</h2></div><button class="close" id="closeAccount">×</button></div><div id="accountBody"></div></section></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script><script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
 <script>
+function initSTNDMotion(){
+ const intro=document.getElementById('introScreen');
+ const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const gsap=window.gsap;
+ if(!gsap||reduced){intro?.remove();return}
+ gsap.registerPlugin(window.ScrollTrigger);
+ document.documentElement.classList.add('js-motion');
+ const letters=gsap.utils.toArray('.intro-letter');
+ const tl=gsap.timeline({defaults:{ease:'power3.out'},onComplete:()=>{intro?.remove();document.documentElement.classList.remove('js-motion')}});
+ tl.to('.intro-kicker',{opacity:1,y:0,duration:.45})
+   .to(letters,{y:0,opacity:1,duration:.85,stagger:.09,ease:'power4.out'},'-=.12')
+   .to('.intro-rule',{width:'min(42vw,360px)',duration:.55},'-=.25')
+   .to('.intro-foot',{opacity:1,duration:.4},'-=.2')
+   .to('.intro-inner',{scale:.94,opacity:0,duration:.45,delay:.45,ease:'power2.in'})
+   .to(intro,{yPercent:-100,duration:.85,ease:'power4.inOut'},'-=.08');
+ gsap.from('.hero-copy .eyebrow',{y:24,opacity:0,duration:.7,delay:2.1});
+ gsap.from('.hero h1',{y:65,opacity:0,duration:1,delay:2.18,ease:'power4.out'});
+ gsap.from('.hero-copy>p:not(.eyebrow),.hero-copy .button-red,.hero-index',{y:24,opacity:0,duration:.7,delay:2.35,stagger:.12});
+ gsap.from('.hero-image img',{scale:1.13,duration:1.8,delay:2.05,ease:'power2.out'});
+ gsap.utils.toArray('.section-head,.category-card,.new-drop,.manifesto,.product').forEach((el)=>{
+   el.setAttribute('data-reveal','');
+   gsap.fromTo(el,{y:38,opacity:0},{y:0,opacity:1,duration:.8,ease:'power3.out',scrollTrigger:{trigger:el,start:'top 88%',once:true}});
+ });
+ gsap.to('.ticker span',{xPercent:-22,ease:'none',duration:18,repeat:-1});
+ gsap.utils.toArray('.category-card img,.drop-image img').forEach(img=>gsap.to(img,{yPercent:-5,ease:'none',scrollTrigger:{trigger:img,start:'top bottom',end:'bottom top',scrub:true}}));
+}
+window.addEventListener('load',initSTNDMotion,{once:true});
 let products=[],cart=[],currentUser=null,sellerProducts=[],authMode="login",activeCategory="all",activeSort="featured";
 const $=s=>document.querySelector(s),money=n=>Number(n||0).toFixed(2);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
