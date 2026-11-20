@@ -144,7 +144,7 @@ document.addEventListener("error",e=>{
  const img=e.target;if(!(img instanceof HTMLImageElement)||!img.closest(".product-image"))return;
  let next=[];try{next=JSON.parse(img.dataset.fallbackImages||"[]")}catch{}
  if(next.length){img.src=next.shift();img.dataset.fallbackImages=JSON.stringify(next);}
- else{img.hidden=true;img.parentElement.classList.add("image-unavailable");}
+ else{img.hidden=true;img.parentElement.classList.add("image-unavailable");if(!img.parentElement.querySelector(".product-image-empty")){const fallback=document.createElement("div");fallback.className="product-image-empty";fallback.setAttribute("role","img");fallback.setAttribute("aria-label","Product photograph unavailable");fallback.textContent="PRODUCT PHOTO UNAVAILABLE";img.parentElement.appendChild(fallback);}}
 },true);
 function renderHomeProducts(){const home=$("#homeProducts");if(home)home.innerHTML=products.slice(0,4).map(productCard).join("")||'<div class="account-empty">The first collection is being prepared.</div>'}
 function catalogStatus(message){let status=$("#catalogStatus");if(!status){status=document.createElement("p");status.id="catalogStatus";status.className="catalog-status";status.setAttribute("role","status");$("#shopView")?.insertBefore(status,$("#products"));}status.textContent=message;status.hidden=!message}
