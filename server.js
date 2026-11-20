@@ -431,4 +431,9 @@ app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")))
 app.use((err,req,res,next)=>{console.error(err);res.status(500).json({error:"Something went wrong. Please try again."});});
 const cleanup=setInterval(()=>db.prepare("DELETE FROM sessions WHERE expires_at<=?").run(Date.now()),3600000);
 cleanup.unref();
-app.listen(PORT,"0.0.0.0",()=>console.log("QuickCart API and storefront listening on "+PORT));
+app.listen(PORT,"0.0.0.0",()=>{
+  console.log("QuickCart API and storefront listening on "+PORT);
+  if(process.env.DB_CONNECTION_TEST==="1"){
+    require("./db-check").run().catch(()=>{});
+  }
+});
