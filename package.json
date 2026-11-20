@@ -1,8 +1,8 @@
 {
-  "name": "quickcart-ecommerce",
+  "name": "stnd-fashion-storefront",
   "version": "1.0.1",
   "private": true,
-  "description": "QuickCart demo ecommerce app",
+  "description": "STND. contemporary fashion e-commerce storefront",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
