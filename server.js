@@ -220,7 +220,7 @@ app.put("/api/admin/products/:id/variants",auth,adminOnly,asyncRoute(async(req,r
     }
     if(variants.length){await c.query("update public.product_variants set active=false,updated_at=now() where product_id=$1 and sku<>all($2::text[])",[productId,variants.map(v=>String(v.sku).trim())]);}
     else await c.query("update public.product_variants set active=false,updated_at=now() where product_id=$1",[productId]);
-    await c.query("update public.products set stock=coalesce((select sum(stock) from public.product_variants where product_id=$1 and active=true),0),updated_at=now() where id=$1",[productId]);
+    if(variants.length)await c.query("update public.products set stock=coalesce((select sum(stock) from public.product_variants where product_id=$1 and active=true),0),updated_at=now() where id=$1",[productId]);
     await c.query("commit");
     const grouped=await getVariantsForProducts([productId]);
     res.json({variants:grouped.get(productId)||[],message:"Variant inventory saved."});
