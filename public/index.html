@@ -108,6 +108,17 @@
 @media(max-width:520px){.market-results-head{align-items:flex-start;flex-direction:column}.sort-control{width:100%;justify-content:space-between}.sort-control select{flex:1}.heritage-feature{padding:14px}.heritage-art{aspect-ratio:1/1}.heritage-copy h2{font-size:40px}.marketplace-intro{padding:48px 0 26px}.marketplace-view .products{gap:22px 12px}.market-results-head h2{font-size:24px}.market-results-head{align-items:center}}
 
 .auth-divider{display:flex;align-items:center;gap:12px;margin:2px 0;color:var(--muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase}.auth-divider:before,.auth-divider:after{content:"";height:1px;flex:1;background:var(--line)}.google-button{width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:12px;border:1px solid #cfd5cf;background:#fff;color:#202124;font:500 13px var(--sans);letter-spacing:0;transition:background .18s,border-color .18s}.google-button:hover{background:#f7f8f7;border-color:#aeb8b0}.google-mark{font:bold 19px Arial,sans-serif;color:#4285f4}
+/* Three-dimensional supermarket packaging */
+.package-stage{position:relative;aspect-ratio:4/4.5;overflow:hidden;background:radial-gradient(ellipse at 50% 38%,#f9faf4 0%,#e7e9df 56%,#d9ded3 100%);isolation:isolate}
+.package-stage:before{content:"";position:absolute;left:15%;right:15%;height:15%;bottom:8%;border-radius:50%;background:#243b3020;filter:blur(17px);z-index:-1}
+.package-stage canvas{display:block;width:100%;height:100%;touch-action:pan-y;outline:0}
+.package-stage .package-hint{position:absolute;bottom:13px;left:15px;font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:#6e7b70;pointer-events:none}
+.package-stage .package-fallback{position:absolute;inset:0;display:grid;place-items:center}
+.fallback-pack{width:43%;height:58%;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:18px 9px;color:#fff;text-align:center;box-shadow:12px 18px 22px #1a2e2528;background:var(--pack,#315b49);transform:rotate(-5deg);border:1px solid #ffffff40}
+.fallback-pack span{font-size:8px;letter-spacing:.16em}.fallback-pack strong{font:clamp(17px,2vw,24px)/1.05 Georgia,serif;font-weight:400}.fallback-pack small{font-size:7px;letter-spacing:.12em}
+.product{transition:transform .25s ease}.product:hover{transform:translateY(-3px)}
+@media(max-width:520px){.package-stage{aspect-ratio:4/4.7}.package-stage .package-hint{font-size:7px}}
+@media(prefers-reduced-motion:reduce){.product{transition:none}}
 </style>
 </head>
 <body>
@@ -216,7 +227,116 @@ function renderProducts(){
  const sorters={featured:(a,b)=>b.id-a.id,newest:(a,b)=>b.id-a.id,"name-asc":(a,b)=>a.name.localeCompare(b.name),"price-asc":(a,b)=>a.price-b.price,"price-desc":(a,b)=>b.price-a.price,"stock-desc":(a,b)=>b.stock-a.stock};filtered=[...filtered].sort(sorters[activeSort]||sorters.featured);
  $("#resultCount").textContent=filtered.length+" "+(filtered.length===1?"product":"products");
  $("#marketEmpty").hidden=filtered.length!==0;
- $("#products").innerHTML=filtered.map(p=>'<article class="product"><div class="product-image"><img src="'+esc(p.image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div class="product-meta"><div><h4>'+esc(p.name)+'</h4><p>'+esc(p.description)+'</p><small>'+Number(p.stock)+' available</small><br><button class="add" data-add="'+p.id+'">Add to bag +</button></div><span class="price">$'+money(p.price)+'</span></div></article>').join("");
+ $("#products").innerHTML=filtered.map(p=>'<article class="product"><div class="package-stage" data-package data-name="'+esc(p.name)+'" data-category="'+esc(p.category)+'" data-id="'+p.id+'" aria-label="Interactive 3D package for '+esc(p.name)+'"><div class="package-fallback"><div class="fallback-pack"><span>QUICKCART / SELECT</span><strong>'+esc(p.name)+'</strong><small>THE EVERYDAY EDIT</small></div></div><span class="package-hint">3D PACKAGING · MOVE TO EXPLORE</span></div><div class="product-meta"><div><h4>'+esc(p.name)+'</h4><p>'+esc(p.description)+'</p><small>'+Number(p.stock)+' available</small><br><button class="add" data-add="'+p.id+'">Add to bag +</button></div><span class="price">
+}
+function renderCart(){const count=cart.reduce((s,i)=>s+i.quantity,0);$("#count").textContent=count;$("#items").innerHTML=cart.length?cart.map(i=>{const p=products.find(p=>p.id===i.id);if(!p)return "";return '<div class="cart-row"><span>'+esc(p.name)+' × '+i.quantity+'</span><span>$'+money(p.price*i.quantity)+' <button data-remove="'+i.id+'">Remove</button></span></div>'}).join(""):"Your bag is empty.";$("#total").textContent=money(cart.reduce((s,i)=>{const p=products.find(p=>p.id===i.id);return s+(p?p.price*i.quantity:0)},0))}
+function cartPanel(open){$("#cartPanel").classList.toggle("open",open);$("#backdrop").classList.toggle("show",open)}
+$("#products").addEventListener("click",e=>{const b=e.target.closest("[data-add]");if(!b)return;const id=Number(b.dataset.add),p=products.find(x=>x.id===id),item=cart.find(x=>x.id===id);if(!p)return;if(item){if(item.quantity>=p.stock){$("#message").textContent="You've reached the available stock.";return}item.quantity++}else cart.push({id,quantity:1});renderCart();$("#message").textContent="Added to your bag.";cartPanel(true)});
+$("#items").addEventListener("click",e=>{const b=e.target.closest("[data-remove]");if(!b)return;cart=cart.filter(x=>x.id!==Number(b.dataset.remove));renderCart()});
+$("#openCart").onclick=()=>cartPanel(true);$("#closeCart").onclick=()=>cartPanel(false);$("#backdrop").onclick=()=>cartPanel(false);
+$("#checkout").addEventListener("submit",async e=>{e.preventDefault();if(!cart.length){$("#message").textContent="Add an item before checking out.";return}const customer=Object.fromEntries(new FormData(e.currentTarget).entries());try{const d=await api("/api/checkout",{method:"POST",body:JSON.stringify({customer,items:cart})});$("#message").textContent="Order #"+d.orderId+" placed. Total: $"+money(d.total);cart=[];renderCart();e.currentTarget.reset();await loadProducts()}catch(err){$("#message").textContent=err.message}});
+function accountOpen(open){$("#accountBackdrop").classList.toggle("open",open);if(open)refreshAccount()}
+$("#openAccount").onclick=()=>accountOpen(true);$("#closeAccount").onclick=()=>accountOpen(false);
+$("#accountBackdrop").addEventListener("click",e=>{if(e.target.id==="accountBackdrop")accountOpen(false)});
+function setAuthMode(mode,role){authMode=mode;document.querySelectorAll("[data-auth-mode]").forEach(b=>b.classList.toggle("active",b.dataset.authMode===mode));const form=$("#authForm");if(!form)return;form.elements.name.parentElement.hidden=mode!=="register";form.elements.role.parentElement.hidden=mode!=="register";form.elements.name.required=mode==="register";if(role)form.elements.role.value=role;const googleButton=$("#googleSignIn");if(googleButton)googleButton.dataset.role=form.elements.role.value;$("#authSubmit").textContent=mode==="register"?"Create account →":"Sign in →";$("#authMessage").textContent=mode==="register"?"Choose buyer or seller to create your account.":"Sign in to manage your QuickCart account."}
+function authMarkup(){return '<div class="auth-tabs"><button type="button" class="auth-tab active" data-auth-mode="login">Sign in</button><button type="button" class="auth-tab" data-auth-mode="register">Create account</button></div><form id="authForm" class="auth-form"><label>Full name<input name="name" autocomplete="name"></label><label>Email address<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" minlength="8" autocomplete="current-password" required></label><label>Account type<select name="role"><option value="buyer">I want to shop</option><option value="seller">I want to sell</option></select></label><button class="primary" type="submit" id="authSubmit">Sign in →</button><div class="auth-divider">or</div><button class="google-button" type="button" id="googleSignIn"><span class="google-mark" aria-hidden="true">G</span>Continue with Google</button><p class="notice" id="authMessage">Sign in or create an account.</p></form>'}
+async function refreshAccount(){try{currentUser=(await api("/api/auth/me")).user;renderAccount()}catch{currentUser=null;$("#accountBody").innerHTML=authMarkup();document.querySelectorAll("[data-auth-mode]").forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));$("#authForm").onsubmit=submitAuth;$("#googleSignIn").onclick=()=>{const role=authMode==="register"?$("#authForm").elements.role.value:"buyer";window.location.assign("/auth/google?role="+encodeURIComponent(role))};setAuthMode("login");const googleStatus=new URLSearchParams(location.search).get("google");if(googleStatus==="setup")$("#authMessage").textContent="Google sign-in needs setup: add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URI to the Render service environment.";else if(googleStatus==="failed")$("#authMessage").textContent="Google sign-in could not be completed. Please try again or use email and password."}}
+async function submitAuth(e){e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget).entries()),msg=$("#authMessage");try{const d=await api("/api/auth/"+(authMode==="register"?"register":"login"),{method:"POST",body:JSON.stringify(data)});currentUser=d.user;$("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0]+" ↗";renderAccount()}catch(err){msg.textContent=err.message}}
+function renderAccount(){const seller=currentUser.role==="seller";$("#accountBody").innerHTML='<div class="account-user"><div><small>'+esc(currentUser.role.toUpperCase())+'</small><br><strong>'+esc(currentUser.name)+'</strong><br><small>'+esc(currentUser.email)+'</small></div><div class="account-actions"><button id="logoutBtn">Sign out</button></div></div>'+(seller?'<div class="seller-dashboard"><h3>Seller overview</h3><p class="seller-section-note">A live summary of your listings, inventory and recorded sales.</p><div class="seller-overview"><div class="seller-metric"><span>Products</span><strong id="sellerMetricProducts">0</strong></div><div class="seller-metric"><span>Active listings</span><strong id="sellerMetricActive">0</strong></div><div class="seller-metric"><span>Units in stock</span><strong id="sellerMetricStock">0</strong></div><div class="seller-metric"><span>Recorded sales</span><strong id="sellerMetricSales">$0.00</strong></div></div><h3>Your shop · Add a product</h3><form id="sellerForm" class="seller-form"><label>Product name<input name="name" required maxlength="120"></label><label>Price (USD)<input name="price" type="number" min="0" step=".01" required></label><label class="full">Description<textarea name="description" required maxlength="2000"></textarea></label><label>Image URL<input name="image" type="url" required></label><label>Category<select name="category"><option>Everyday</option><option>Work & tech</option><option>Home & living</option><option>Everyday carry</option></select></label><label>Starting quantity<input name="stock" type="number" min="0" value="1" required></label><button class="primary">List product +</button></form><h3>Your inventory</h3><div id="inventoryList" class="inventory-list">Loading…</div><h3>Incoming orders</h3><div id="sellerOrders" class="account-empty">Loading…</div></div>':'<div class="buyer-orders"><h3>Your orders</h3><div id="buyerOrderList" class="account-empty">Loading…</div></div>');
+ $("#logoutBtn").onclick=async()=>{await api("/api/auth/logout",{method:"POST"});currentUser=null;$("#openAccount").textContent="Account ↗";refreshAccount()};
+ if(seller){$("#sellerForm").onsubmit=createProduct;loadSeller()}else loadBuyerOrders()}
+async function createProduct(e){e.preventDefault();const d=Object.fromEntries(new FormData(e.currentTarget).entries());d.price=Number(d.price);d.stock=Number(d.stock);try{await api("/api/seller/products",{method:"POST",body:JSON.stringify(d)});e.currentTarget.reset();await loadSeller();await loadProducts()}catch(err){alert(err.message)}}
+async function loadSeller(){try{sellerProducts=await api("/api/seller/products");$("#sellerMetricProducts").textContent=sellerProducts.length;$("#sellerMetricActive").textContent=sellerProducts.filter(p=>p.active).length;$("#sellerMetricStock").textContent=sellerProducts.filter(p=>p.active).reduce((sum,p)=>sum+Number(p.stock||0),0).toLocaleString();$("#inventoryList").innerHTML=sellerProducts.length?sellerProducts.map(p=>'<div class="inventory-item"><div><strong>'+esc(p.name)+'</strong><small>$'+money(p.price)+' · Stock: '+p.stock+' · '+(p.active?"Listed":"Removed")+'</small></div><div class="inventory-actions"><button data-stock="-1" data-id="'+p.id+'">−</button><button data-stock="1" data-id="'+p.id+'">+ qty</button><button data-edit="'+p.id+'">Edit</button><button data-delete="'+p.id+'">Remove</button></div></div>').join(""):'<div class="account-empty">No products yet. Add your first listing above.</div>';$("#inventoryList").onclick=inventoryAction;const orders=await api("/api/seller/orders");const sales=orders.reduce((sum,o)=>sum+Number(o.unit_price)*Number(o.quantity),0);$("#sellerMetricSales").textContent="$"+money(sales);$("#sellerOrders").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+' · '+esc(o.product_name)+'</strong><small>'+esc(o.customer_name)+' · Qty '+o.quantity+'</small></div><b>$'+money(o.unit_price*o.quantity)+'</b></div>').join(""):"No orders for your products yet."}catch(e){$("#inventoryList").textContent=e.message}}
+async function inventoryAction(e){const b=e.target.closest("button");if(!b)return;const id=Number(b.dataset.id||b.dataset.edit||b.dataset.delete),p=sellerProducts.find(x=>x.id===id);if(!p)return;try{if(b.dataset.stock){await api("/api/seller/products/"+id,{method:"PATCH",body:JSON.stringify({stock:Math.max(0,p.stock+Number(b.dataset.stock))})})}else if(b.dataset.delete){if(!confirm("Remove "+p.name+" from your storefront?"))return;await api("/api/seller/products/"+id,{method:"DELETE"})}else{const name=prompt("Product name",p.name);if(name===null)return;const price=prompt("Price (USD)",p.price);if(price===null)return;const stock=prompt("Available quantity",p.stock);if(stock===null)return;await api("/api/seller/products/"+id,{method:"PATCH",body:JSON.stringify({name,price:Number(price),stock:Number(stock)})})}await loadSeller();await loadProducts()}catch(err){alert(err.message)}}
+async function loadBuyerOrders(){try{const orders=await api("/api/orders");$("#buyerOrderList").innerHTML=orders.length?orders.map(o=>'<div class="inventory-item"><div><strong>Order #'+o.id+'</strong><small>'+esc(o.status)+' · '+esc(o.created_at)+'</small></div><b>$'+money(o.total)+'</b></div>').join(""):"No orders yet."}catch(e){$("#buyerOrderList").textContent=e.message}}
+(async()=>{try{currentUser=(await api("/api/auth/me")).user;$("#openAccount").textContent="Hi, "+currentUser.name.split(" ")[0]+" ↗"}catch{}})();
+document.addEventListener("keydown",e=>{if(e.key==="/"&&!e.ctrlKey&&!e.metaKey&&!["INPUT","TEXTAREA"].includes(document.activeElement.tagName)&&!$("#marketplaceView").hidden){e.preventDefault();$("#productSearch").focus()}if(e.key==="Escape"){accountOpen(false);cartPanel(false)}});
+
+</script>
+
+<script src="/vendor/gsap/gsap.min.js"></script>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { GLTFLoader } from "/vendor/three-addons/loaders/GLTFLoader.js";
+const packageScenes=[];
+const paletteFor=(category,name)=>{
+ const key=(category+" "+name).toLowerCase();
+ if(/tech|headphone|watch|electronic/.test(key))return {base:"#254d46",accent:"#d2b77e",ink:"#f7f3e8"};
+ if(/home|lamp|living/.test(key))return {base:"#b86e4e",accent:"#e7c99c",ink:"#fff8e9"};
+ if(/carry|backpack|shoe|travel/.test(key))return {base:"#526d8a",accent:"#e1bd76",ink:"#fff9ec"};
+ return {base:"#557456",accent:"#d6bd7b",ink:"#fff9ec"};
+};
+function labelTexture(name,category,palette){
+ const canvas=document.createElement("canvas");canvas.width=512;canvas.height=768;
+ const c=canvas.getContext("2d");c.fillStyle=palette.base;c.fillRect(0,0,512,768);
+ c.fillStyle=palette.accent;c.fillRect(32,34,448,7);c.fillRect(32,714,448,3);
+ c.fillStyle=palette.ink;c.textAlign="center";c.font="600 22px Arial";c.fillText("QUICKCART  /  SELECT",256,90);
+ c.strokeStyle=palette.accent;c.lineWidth=2;c.strokeRect(62,138,388,490);
+ c.font="italic 30px Georgia";c.fillText("THE EVERYDAY",256,210);c.fillText("EDIT",256,250);
+ const words=name.split(" ");let lines=[],line="";
+ c.font="47px Georgia";for(const word of words){const test=(line+" "+word).trim();if(c.measureText(test).width>370&&line){lines.push(line);line=word}else line=test}
+ if(line)lines.push(line);c.font=(lines.length>2?39:47)+"px Georgia";
+ const start=390-(lines.length-1)*28;lines.slice(0,3).forEach((v,i)=>c.fillText(v,256,start+i*58));
+ c.strokeStyle=palette.accent;c.beginPath();c.arc(256,548,37,0,Math.PI*2);c.stroke();
+ c.fillStyle=palette.ink;c.font="600 14px Arial";c.fillText(category.toUpperCase().slice(0,25),256,650);
+ c.font="13px Arial";c.fillText("GOOD THINGS. CHOSEN WELL.",256,682);
+ const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;return texture;
+}
+function makePackage(name,category){
+ const palette=paletteFor(category,name),label=labelTexture(name,category,palette);
+ const root=new THREE.Group(),key=(category+" "+name).toLowerCase();
+ const material=new THREE.MeshStandardMaterial({color:palette.base,roughness:.48,metalness:.04});
+ const labelMat=new THREE.MeshStandardMaterial({map:label,roughness:.7});
+ const accent=new THREE.MeshStandardMaterial({color:palette.accent,roughness:.32,metalness:.12});
+ const add=(geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;root.add(m);return m};
+ if(/bottle|drink|water/.test(key)){
+  add(new THREE.CylinderGeometry(.64,.72,2.25,48,1),material,0,0,0);
+  add(new THREE.CylinderGeometry(.34,.42,.5,40),material,0,1.35,0);
+  add(new THREE.CylinderGeometry(.36,.36,.2,40),accent,0,1.7,0);
+  add(new THREE.CylinderGeometry(.646,.646,.88,48),labelMat,0,.05,0);
+ }else if(/lamp|headphone|watch|shoe|backpack/.test(key)){
+  const w=/backpack|shoe/.test(key)?1.75:1.55,h=/backpack/.test(key)?2.2:1.8;
+  add(new THREE.BoxGeometry(w,h,.72),material,0,0,0);
+  add(new THREE.PlaneGeometry(w*.94,h*.86),labelMat,0,0,.367);
+  if(/headphone/.test(key)){
+   const arch=new THREE.Mesh(new THREE.TorusGeometry(.55,.09,14,48,Math.PI),accent);arch.position.set(0,.95,0);arch.rotation.z=Math.PI;root.add(arch);
+   add(new THREE.BoxGeometry(.32,.6,.28),accent,-.57,.55,.03);add(new THREE.BoxGeometry(.32,.6,.28),accent,.57,.55,.03);
+  }
+ }else{
+  add(new THREE.BoxGeometry(1.62,2.15,.78),material,0,0,0);
+  add(new THREE.PlaneGeometry(1.58,2.08),labelMat,0,0,.397);
+  add(new THREE.BoxGeometry(1.62,.13,.8),accent,0,1.08,0);
+ }
+ return root;
+}
+const loader=new GLTFLoader();
+function fallbackMarkup(el){const p=paletteFor(el.dataset.category,el.dataset.name);const pack=el.querySelector(".fallback-pack");if(pack)pack.style.setProperty("--pack",p.base)}
+function initStage(el){
+ if(el.dataset.initialized)return;el.dataset.initialized="1";fallbackMarkup(el);
+ let renderer;try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:"low-power"})}catch(e){return}
+ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
+ const canvas=renderer.domElement;canvas.setAttribute("aria-label","Interactive rotating 3D product package");el.querySelector(".package-fallback")?.remove();el.prepend(canvas);
+ const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(32,1,.1,100);camera.position.set(0,.15,7.7);
+ scene.add(new THREE.HemisphereLight(0xffffff,0x7c897b,2.1));
+ const keyLight=new THREE.DirectionalLight(0xffffff,3.2);keyLight.position.set(-3,5,6);scene.add(keyLight);
+ const rim=new THREE.DirectionalLight(0xe5d6ae,1.8);rim.position.set(4,2,-4);scene.add(rim);
+ const group=new THREE.Group();scene.add(group);const product=makePackage(el.dataset.name,el.dataset.category);group.add(product);
+ const resize=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()};
+ const ro=new ResizeObserver(resize);ro.observe(el);resize();
+ const item={el,renderer,scene,camera,group,product,visible:false,ro};packageScenes.push(item);
+ const slug=String(el.dataset.id).replace(/[^a-z0-9_-]/gi,"");
+ loader.load("/models/product-"+slug+".glb",gltf=>{if(!el.isConnected)return;group.remove(product);item.product=gltf.scene;gltf.scene.scale.setScalar(1.18);gltf.scene.position.y=-.02;group.add(gltf.scene)},undefined,()=>{});
+ const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+ if(window.gsap&&!reduced){gsap.to(group.rotation,{y:Math.PI*2,duration:17,repeat:-1,ease:"none"});gsap.to(group.position,{y:.07,duration:2.8,repeat:-1,yoyo:true,ease:"sine.inOut"})}
+ el.addEventListener("pointerenter",()=>{if(window.gsap&&!reduced)gsap.to(group.rotation,{x:-.1,y:group.rotation.y+.45,duration:.65,ease:"power3.out"})});
+ el.addEventListener("pointerleave",()=>{if(window.gsap&&!reduced)gsap.to(group.rotation,{x:0,duration:.5,ease:"power2.out"})});
+ el.addEventListener("pointermove",e=>{if(!window.gsap||reduced||e.pointerType==="touch")return;const r=el.getBoundingClientRect();gsap.to(group.rotation,{x:((e.clientY-r.top)/r.height-.5)*-.28,y:((e.clientX-r.left)/r.width-.5)*.48,duration:.35,ease:"power2.out",overwrite:true})});
+}
+const visibility=new IntersectionObserver(entries=>entries.forEach(entry=>{const item=packageScenes.find(x=>x.el===entry.target);if(item)item.visible=entry.isIntersecting}),{rootMargin:"100px"});
+window.initQuickCartPackages=()=>document.querySelectorAll("[data-package]").forEach(el=>{initStage(el);visibility.observe(el)});
+function animate(){requestAnimationFrame(animate);for(const p of packageScenes)if(p.visible&&p.el.isConnected)p.renderer.render(p.scene,p.camera)}
+animate();window.initQuickCartPackages();
+</script></body></html>+money(p.price)+'</span></div></article>').join("");if(window.initQuickCartPackages)window.initQuickCartPackages();
 }
 function renderCart(){const count=cart.reduce((s,i)=>s+i.quantity,0);$("#count").textContent=count;$("#items").innerHTML=cart.length?cart.map(i=>{const p=products.find(p=>p.id===i.id);if(!p)return "";return '<div class="cart-row"><span>'+esc(p.name)+' × '+i.quantity+'</span><span>$'+money(p.price*i.quantity)+' <button data-remove="'+i.id+'">Remove</button></span></div>'}).join(""):"Your bag is empty.";$("#total").textContent=money(cart.reduce((s,i)=>{const p=products.find(p=>p.id===i.id);return s+(p?p.price*i.quantity:0)},0))}
 function cartPanel(open){$("#cartPanel").classList.toggle("open",open);$("#backdrop").classList.toggle("show",open)}
