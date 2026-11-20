@@ -133,7 +133,7 @@ const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 async function api(url,options={}){const r=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({error:"Unexpected server response."}));if(!r.ok)throw Error(d.error||"Request failed.");return d}
 function productImages(p){
  const raw=[p?.image,...(Array.isArray(p?.images)?p.images:[])];
- return [...new Set(raw.filter(v=>typeof v==="string"&&/^https?:\\/\\//i.test(v.trim())).map(v=>v.trim()))];
+ return [...new Set(raw.filter(v=>typeof v==="string"&&/^https?:\/\//i.test(v.trim())).map(v=>v.trim()))];
 }
 function productCard(p){
  const t=String.fromCharCode(60),images=productImages(p),cover=images[0]||"";
