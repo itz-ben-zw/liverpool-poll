@@ -1,0 +1,28 @@
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const pieces=[
+ {name:"Essential Tee",colour:"Black / Relaxed fit",price:"$28.00",description:"A clean everyday layer with a relaxed silhouette.",front:"https://images.pexels.com/photos/8532616/pexels-photo-8532616.jpeg?auto=compress&cs=tinysrgb&w=900",back:"https://images.pexels.com/photos/8532638/pexels-photo-8532638.jpeg?auto=compress&cs=tinysrgb&w=900",hasBack:true},
+ {name:"Core Hoodie",colour:"Chalk / Heavyweight",price:"$64.00",description:"A soft, understated layer with a considered everyday shape.",front:"https://images.pexels.com/photos/8217400/pexels-photo-8217400.jpeg?auto=compress&cs=tinysrgb&w=900",back:"https://images.pexels.com/photos/8217415/pexels-photo-8217415.jpeg?auto=compress&cs=tinysrgb&w=900",hasBack:true},
+ {name:"Daily Tee",colour:"White / Regular fit",price:"$26.00",description:"A simple wardrobe staple, built around a straightforward fit.",front:"https://images.pexels.com/photos/11671964/pexels-photo-11671964.jpeg?auto=compress&cs=tinysrgb&w=900",back:null,hasBack:false}
+];
+const stage=$("demoRackStage"),layer=$("demoRackGarments");
+if(!stage||!layer)return;
+let active=0,front=true,position=0,drag=null,raf=0;
+const garments=pieces.map((piece,i)=>{
+ const button=document.createElement("button");button.type="button";button.className="demo-rack-garment";button.setAttribute("aria-label","Select "+piece.name);
+ button.innerHTML='<svg class="demo-rack-hanger" viewBox="0 0 180 70" aria-hidden="true"><path d="M90 10c0-9 14-9 14 0 0 5-6 8-14 13L9 58M90 23l81 35" fill="none" stroke="#292927" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><img src="'+piece.front+'" alt="'+piece.name+' sample garment" draggable="false">';
+ button.addEventListener("click",()=>{if(stage.dataset.dragged==="yes"){stage.dataset.dragged="no";return;}select(i);});layer.appendChild(button);return button;
+});
+function render(){const spacing=Math.max(78,Math.min(130,stage.clientWidth*.25));garments.forEach((el,i)=>{const d=i-position,a=Math.abs(d);el.style.transform="translateX("+(d*spacing)+"px) translateZ("+(-Math.min(a,3)*42)+"px) rotateY("+Math.max(-42,Math.min(42,d*-16))+"deg) scale("+(1-Math.min(a,2.4)*.14)+")";el.style.opacity=String(Math.max(.13,1-Math.max(0,a-1.2)*.55));el.style.zIndex=String(20-Math.round(a*5));});$("demoRackCounter").textContent=String(active+1).padStart(2,"0")+" / "+String(pieces.length).padStart(2,"0");$("demoRackPrev").disabled=active===0;$("demoRackNext").disabled=active===pieces.length-1;}
+function update(){const p=pieces[active],img=garments[active].querySelector("img");$("demoRackName").textContent=p.name;$("demoRackColour").textContent=p.colour;$("demoRackPrice").innerHTML=p.price+' <small>sample price</small>';$("demoRackDescription").textContent=p.description;front=true;img.src=p.front;img.alt=p.name+" sample front view";$("demoRackFront").classList.add("selected");$("demoRackFront").setAttribute("aria-pressed","true");$("demoRackBack").classList.remove("selected");$("demoRackBack").setAttribute("aria-pressed","false");$("demoRackBack").disabled=!p.hasBack;$("demoRackSizes").querySelectorAll("button").forEach((b,i)=>b.classList.toggle("selected",i===1));}
+function select(i){active=Math.max(0,Math.min(pieces.length-1,i));const start=position,end=active;if(window.matchMedia("(prefers-reduced-motion: reduce)").matches){position=end;render();update();return;}const began=performance.now();cancelAnimationFrame(raf);function step(now){const t=Math.min(1,(now-began)/520),ease=1-Math.pow(1-t,4);position=start+(end-start)*ease;render();if(t<1)raf=requestAnimationFrame(step);else{position=end;render();update();}}raf=requestAnimationFrame(step);}
+$("demoRackPrev").addEventListener("click",()=>select(active-1));$("demoRackNext").addEventListener("click",()=>select(active+1));
+$("demoRackFront").addEventListener("click",()=>{front=true;const img=garments[active].querySelector("img");img.style.transform="rotateY(90deg)";setTimeout(()=>{img.src=pieces[active].front;img.alt=pieces[active].name+" sample front view";img.style.transform="rotateY(0deg)";},220);$("demoRackFront").classList.add("selected");$("demoRackBack").classList.remove("selected");$("demoRackFront").setAttribute("aria-pressed","true");$("demoRackBack").setAttribute("aria-pressed","false");});
+$("demoRackBack").addEventListener("click",()=>{if(!pieces[active].hasBack)return;front=false;const img=garments[active].querySelector("img");img.style.transform="rotateY(90deg)";setTimeout(()=>{img.src=pieces[active].back;img.alt=pieces[active].name+" sample alternate view";img.style.transform="rotateY(0deg)";},220);$("demoRackBack").classList.add("selected");$("demoRackFront").classList.remove("selected");$("demoRackBack").setAttribute("aria-pressed","true");$("demoRackFront").setAttribute("aria-pressed","false");});
+$("demoRackSizes").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;$("demoRackSizes").querySelectorAll("button").forEach(x=>x.classList.toggle("selected",x===b));});
+stage.addEventListener("pointerdown",e=>{drag={x:e.clientX,start:position,moved:false};});
+window.addEventListener("pointermove",e=>{if(!drag)return;const dx=e.clientX-drag.x;if(Math.abs(dx)>7)drag.moved=true;if(drag.moved){position=Math.max(0,Math.min(pieces.length-1,drag.start-dx/Math.max(78,Math.min(130,stage.clientWidth*.25))));render();}});
+window.addEventListener("pointerup",()=>{if(!drag)return;if(drag.moved){stage.dataset.dragged="yes";select(Math.round(position));setTimeout(()=>stage.dataset.dragged="no",0);}drag=null;});
+render();update();
+})();
