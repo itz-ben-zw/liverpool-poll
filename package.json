@@ -5,13 +5,15 @@
   "description": "STND. contemporary fashion e-commerce storefront",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "db:check": "node db-check.js"
   },
   "engines": {
     "node": ">=22.5.0"
   },
   "dependencies": {
     "express": "4.21.2",
-    "google-auth-library": "^11.3.4"
+    "google-auth-library": "^11.3.4",
+    "pg": "^8.16.3"
   }
 }
