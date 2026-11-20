@@ -80,6 +80,9 @@ addColumnIfMissing("products", "category", "TEXT NOT NULL DEFAULT 'Everyday'");
 addColumnIfMissing("products", "active", "INTEGER NOT NULL DEFAULT 1");
 addColumnIfMissing("orders", "user_id", "INTEGER REFERENCES users(id)");
 addColumnIfMissing("orders", "status", "TEXT NOT NULL DEFAULT 'placed'");
+addColumnIfMissing("orders", "payment_reference", "TEXT");
+addColumnIfMissing("orders", "payment_provider", "TEXT");
+db.exec("CREATE UNIQUE INDEX IF NOT EXISTS orders_payment_reference_unique ON orders(payment_reference) WHERE payment_reference IS NOT NULL;");
 
 const seed = [
  ["Essential Oversized Tee","A heavyweight cotton jersey tee with a relaxed, considered silhouette.",88,"https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=900&q=85","Men",18],
