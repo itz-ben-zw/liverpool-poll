@@ -16,15 +16,18 @@ if(typeof nativeOpen==="function")window.openProductInfo=function(id,trigger){
  initRack(product,colours);
 };
 function renderSingleProductRack(product,body){
- const image=(product.images&&product.images.length?product.images[0]:product.image)||"";
+ const images=[product.image,...(Array.isArray(product.images)?product.images:[])].filter((url,index,all)=>typeof url==="string"&&/^https?:\\/\\//i.test(url.trim())&&all.indexOf(url)===index);
+ const image=images[0]||"";
  const original=body.innerHTML;
  const available=Math.max(0,Number(product.stock)||0);
  const wrap=document.createElement("div");wrap.className="rack-single-experience";
  const stage=document.createElement("div");stage.className="rack-single-stage";
  const rail=document.createElement("div");rail.className="rack-single-rail";stage.appendChild(rail);
- stage.insertAdjacentHTML("beforeend",'<svg class="rack-single-hanger" viewBox="0 0 180 74" aria-hidden="true"><path d="M90 12c0-10 15-10 15 0 0 5-6 8-15 14L9 61M90 26l81 35" fill="none" stroke="#292927" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>');
- if(image){const img=document.createElement("img");img.className="rack-single-image";img.src=image;img.alt=product.name;img.draggable=false;stage.appendChild(img);}
- else{const missing=document.createElement("div");missing.className="rack-single-no-image";missing.textContent="Product image unavailable";stage.appendChild(missing);}
+ const garment=document.createElement("div");garment.className="rack-single-garment";
+ garment.insertAdjacentHTML("beforeend",'<svg class="rack-single-hanger" viewBox="0 0 180 74" aria-hidden="true"><path d="M90 12c0-10 15-10 15 0 0 5-6 8-15 14L9 61M90 26l81 35" fill="none" stroke="#292927" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+ if(image){const img=document.createElement("img");img.className="rack-single-image";img.src=image;img.alt=product.name;img.draggable=false;img.addEventListener("error",()=>{const next=images.slice(1).find(url=>url!==img.src);if(next){img.src=next;images.splice(0,images.length,...images.slice(1));}else{img.remove();const missing=document.createElement("div");missing.className="rack-single-no-image";missing.textContent="Product image unavailable";garment.appendChild(missing);}},{once:true});garment.appendChild(img);}
+ else{const missing=document.createElement("div");missing.className="rack-single-no-image";missing.textContent="Product image unavailable";garment.appendChild(missing);}
+ stage.appendChild(garment);
  const tag=document.createElement("span");tag.className="rack-single-label";tag.textContent="STND. / THE PIECE";stage.appendChild(tag);
  const panel=document.createElement("aside");panel.className="rack-single-panel";
  panel.innerHTML='<p class="rack-kicker">STND. / PRODUCT VIEW</p><h3></h3><p class="rack-single-category"></p><p class="rack-price"></p><p class="rack-stock"></p><p class="rack-single-description"></p><button type="button" class="rack-add" id="rackSingleAdd">Add to bag</button><p class="rack-single-note">Single product view · No unconfigured colours or sizes shown</p>';
