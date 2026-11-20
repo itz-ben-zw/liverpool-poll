@@ -131,10 +131,21 @@ let products=INITIAL_CATALOG.map(p=>({...p})),cart=[],currentUser=null,sellerPro
 const $=s=>document.querySelector(s),money=n=>Number(n||0).toFixed(2);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 async function api(url,options={}){const r=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({error:"Unexpected server response."}));if(!r.ok)throw Error(d.error||"Request failed.");return d}
-function productCard(p){
- const t=String.fromCharCode(60);
- return t+"article class=\"product\""+t+"div class=\"product-image\""+t+"img src=\""+esc(p.image)+"\" alt=\""+esc(p.name)+"\" loading=\"lazy\" decoding=\"async\">"+t+"span class=\"product-tag\">"+esc(p.category)+t+"/span>"+t+"button class=\"product-image-open\" type=\"button\" data-view-product=\""+p.id+"\" aria-label=\"View "+esc(p.name)+" on the clothing rack\"></button>"+t+"/div>"+t+"div class=\"product-meta\""+t+"div>"+t+"h3>"+esc(p.name)+t+"/h3>"+t+"p>"+esc(p.description)+t+"/p>"+t+"small class=\"product-rating\">"+(Number(p.review_count)>0?"★ "+Number(p.average_rating).toFixed(1)+" · "+Number(p.review_count)+" reviews":"No reviews yet")+t+"/small>"+t+"/div>"+t+"span class=\"price\">$"+money(p.price)+t+"/span>"+t+"/div>"+t+"div class=\"product-bottom\""+t+"small>"+Number(p.stock)+" available"+t+"/small>"+t+"button class=\"add\" data-view-product=\""+p.id+"\">View on rack +</button>"+t+"/div>"+t+"/article>";
+function productImages(p){
+ const raw=[p?.image,...(Array.isArray(p?.images)?p.images:[])];
+ return [...new Set(raw.filter(v=>typeof v==="string"&&/^https?:\\/\\//i.test(v.trim())).map(v=>v.trim()))];
 }
+function productCard(p){
+ const t=String.fromCharCode(60),images=productImages(p),cover=images[0]||"";
+ const image=cover?t+"img src=\""+esc(cover)+"\" data-fallback-images=\""+esc(JSON.stringify(images.slice(1)))+"\" alt=\""+esc(p.name)+"\" loading=\"lazy\" decoding=\"async\">":t+"div class=\"product-image-empty\" aria-label=\"Product image unavailable\">IMAGE COMING SOON"+t+"/div>";
+ return t+"article class=\"product\""+t+"div class=\"product-image\""+image+t+"span class=\"product-tag\">"+esc(p.category)+t+"/span>"+t+"button class=\"product-image-open\" type=\"button\" data-view-product=\""+p.id+"\" aria-label=\"View "+esc(p.name)+" on the clothing rack\"></button>"+t+"/div>"+t+"div class=\"product-meta\""+t+"div>"+t+"h3>"+esc(p.name)+t+"/h3>"+t+"p>"+esc(p.description)+t+"/p>"+t+"small class=\"product-rating\">"+(Number(p.review_count)>0?"★ "+Number(p.average_rating).toFixed(1)+" · "+Number(p.review_count)+" reviews":"No reviews yet")+t+"/small>"+t+"/div>"+t+"span class=\"price\">$"+money(p.price)+t+"/span>"+t+"/div>"+t+"div class=\"product-bottom\""+t+"small>"+Number(p.stock)+" available"+t+"/small>"+t+"button class=\"add\" data-view-product=\""+p.id+"\">View on rack +</button>"+t+"/div>"+t+"/article>";
+}
+document.addEventListener("error",e=>{
+ const img=e.target;if(!(img instanceof HTMLImageElement)||!img.closest(".product-image"))return;
+ let next=[];try{next=JSON.parse(img.dataset.fallbackImages||"[]")}catch{}
+ if(next.length){img.src=next.shift();img.dataset.fallbackImages=JSON.stringify(next);}
+ else{img.hidden=true;img.parentElement.classList.add("image-unavailable");}
+},true);
 function renderHomeProducts(){const home=$("#homeProducts");if(home)home.innerHTML=products.slice(0,4).map(productCard).join("")||'<div class="account-empty">The first collection is being prepared.</div>'}
 function catalogStatus(message){let status=$("#catalogStatus");if(!status){status=document.createElement("p");status.id="catalogStatus";status.className="catalog-status";status.setAttribute("role","status");$("#shopView")?.insertBefore(status,$("#products"));}status.textContent=message;status.hidden=!message}
 async function loadProducts({retry=false}={}){
