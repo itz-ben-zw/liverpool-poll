@@ -82,13 +82,25 @@ addColumnIfMissing("orders", "user_id", "INTEGER REFERENCES users(id)");
 addColumnIfMissing("orders", "status", "TEXT NOT NULL DEFAULT 'placed'");
 
 const seed = [
- ["Wireless Headphones","Comfortable over-ear headphones with clear sound.",39.99,"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=700","Work & tech",20],
- ["Classic Backpack","A durable everyday backpack with plenty of room.",29.5,"https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=700","Everyday carry",20],
- ["Smart Watch","A sleek watch for notifications and everyday activity.",54,"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=700","Work & tech",20],
- ["Running Shoes","Lightweight trainers designed for daily comfort.",64.99,"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=700","Everyday carry",20],
- ["Desk Lamp","Minimal LED desk lamp for work and study.",22,"https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=700","Home & living",20],
- ["Travel Bottle","Reusable stainless-steel bottle for everyday use.",15.75,"https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=700","Everyday carry",20]
+ ["Essential Oversized Tee","A heavyweight cotton jersey tee with a relaxed, considered silhouette.",88,"https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=900&q=85","Men",18],
+ ["Relaxed Tailored Trousers","Clean lines and a relaxed drape, cut for everyday versatility.",148,"https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=900&q=85","Men",14],
+ ["Structured Knit Polo","A refined knit polo with a soft hand-feel and understated finish.",125,"https://images.unsplash.com/photo-1627225924765-552d49cf47ad?w=900&q=85","Men",12],
+ ["Leather Court Sneakers","Minimal low-top sneakers designed to work beyond one season.",165,"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=900&q=85","Footwear",10],
+ ["Draped Midi Dress","An effortless silhouette with fluid movement and a clean neckline.",178,"https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=900&q=85","Women",9],
+ ["Everyday Leather Tote","A structured carryall with room for the everyday essentials.",135,"https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=900&q=85","Accessories",11]
 ];
+// Convert the original demo catalogue to the STND. launch collection without touching seller-owned listings.
+const legacyFashion = [
+ ["Wireless Headphones","Essential Oversized Tee","A heavyweight cotton jersey tee with a relaxed, considered silhouette.",88,"https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=900&q=85","Men"],
+ ["Classic Backpack","Relaxed Tailored Trousers","Clean lines and a relaxed drape, cut for everyday versatility.",148,"https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=900&q=85","Men"],
+ ["Smart Watch","Structured Knit Polo","A refined knit polo with a soft hand-feel and understated finish.",125,"https://images.unsplash.com/photo-1627225924765-552d49cf47ad?w=900&q=85","Men"],
+ ["Running Shoes","Leather Court Sneakers","Minimal low-top sneakers designed to work beyond one season.",165,"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=900&q=85","Footwear"],
+ ["Desk Lamp","Draped Midi Dress","An effortless silhouette with fluid movement and a clean neckline.",178,"https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=900&q=85","Women"],
+ ["Travel Bottle","Everyday Leather Tote","A structured carryall with room for the everyday essentials.",135,"https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=900&q=85","Accessories"]
+];
+const migrateLegacy = db.prepare("UPDATE products SET name=?,description=?,price=?,image=?,category=? WHERE name=? AND seller_id IS NULL");
+for (const [oldName,name,description,price,image,category] of legacyFashion) migrateLegacy.run(name,description,price,image,category,oldName);
+
 if (!db.prepare("SELECT COUNT(*) AS n FROM products").get().n) {
   const insert = db.prepare("INSERT INTO products(name,description,price,image,category,stock) VALUES(?,?,?,?,?,?)");
   seed.forEach(p => insert.run(...p));
