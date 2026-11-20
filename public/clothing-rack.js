@@ -59,7 +59,7 @@ function initRack(product,colours){
   const button=document.createElement("button");button.type="button";button.className="rack-garment";button.dataset.index=index;button.setAttribute("aria-label","Select "+colour.name);
   const hanger='<svg class="rack-hanger" viewBox="0 0 180 74" aria-hidden="true"><path d="M90 12c0-10 15-10 15 0 0 5-6 8-15 14L9 61M90 26l81 35" fill="none" stroke="#292927" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const image=colour.frontImage?'<img src="'+esc(colour.frontImage)+'" alt="'+esc(product.name)+' in '+esc(colour.name)+'" draggable="false">':'<div class="rack-placeholder"><i style="background:'+swatchColour(colour.name)+'"></i><span>Front image needed</span></div>';
-  button.innerHTML=hanger+image;stage.appendChild(button);garments.push(button);
+  button.innerHTML=hanger+image;const garmentImage=button.querySelector("img");if(garmentImage)garmentImage.addEventListener("error",()=>{garmentImage.remove();const fallback=document.createElement("div");fallback.className="rack-placeholder";const swatch=document.createElement("i");swatch.style.background=swatchColour(colour.name);const label=document.createElement("span");label.textContent="Image unavailable";fallback.append(swatch,label);button.appendChild(fallback);},{once:true});stage.appendChild(button);garments.push(button);
   button.addEventListener("click",()=>{if(stage._dragged){stage._dragged=false;return;}go(index);});
  });
  function render(){
