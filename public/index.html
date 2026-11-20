@@ -53,12 +53,12 @@
 <div class="intro-screen" id="introScreen" aria-label="STND. clothing and accessories"><div class="intro-inner"><div class="intro-kicker">Clothing · Footwear · Accessories</div><div class="intro-word" aria-label="STND"><span class="intro-letter">S</span><span class="intro-letter">T</span><span class="intro-letter">N</span><span class="intro-letter">D</span><span class="intro-letter intro-period">.</span></div><div class="intro-rule"></div><div class="intro-foot">Clothing and accessories for everyday wear</div></div></div>
 
 
-<div class="terms-overlay" id="termsOverlay" role="dialog" aria-modal="true" aria-labelledby="termsTitle">
- <section class="terms-card">
+<div class="terms-overlay" id="termsOverlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="termsTitle" aria-describedby="termsDescription">
+ <section class="terms-card" tabindex="-1">
   <div class="terms-mark">STND<span>.</span></div>
   <p class="terms-kicker">Before you shop</p>
   <h2 id="termsTitle">A few<br>details.</h2>
-  <p class="terms-lead">Welcome to STND. Please take a moment to understand how this storefront works before continuing.</p>
+  <p class="terms-lead" id="termsDescription">Welcome to STND. Please take a moment to understand how this storefront works before continuing.</p>
   <div class="terms-points">
    <div><strong>Orders</strong><p>Product availability and prices are shown on the store. Submitting checkout places an order request; it does not guarantee acceptance or availability.</p></div>
    <div><strong>Payments</strong><p>When hosted checkout is available, payments are handled by the payment provider. An order is confirmed only after a successful payment is verified.</p></div>
@@ -79,11 +79,11 @@
 <a class="category-card" href="#shop" data-open-shop="Accessories"><img src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=900&q=85" alt="Fashion accessories and styling"><span class="category-copy"><small>Bags and accessories</small><strong>Accessories <span>↗</span></strong></span></a>
 </div></section>
 <section class="new-drop"><div class="drop-copy"><p class="eyebrow">From the collection</p><h2>Clothes for<br><span>real days.</span></h2><p>Easy layers, relaxed fits and useful accessories. Start with the pieces you will reach for most.</p><a class="button-red" href="#shop" data-open-shop="all">Browse all products ↗</a></div><div class="drop-image"><img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&q=85" alt="Fashion collection editorial"></div></section>
-<section class="section"><div class="section-head"><div><p class="eyebrow">Available now</p><h2>Shop the<br>collection.</h2></div><p>See the products currently listed in the store.</p></div><div id="homeProducts" class="products"><div class="account-empty">Loading the collection…</div></div><div style="margin-top:30px"><a class="button-red" href="#shop" data-open-shop="all">View all pieces ↗</a></div></section>
+<section class="section"><div class="section-head"><div><p class="eyebrow">Available now</p><h2>Shop the<br>collection.</h2></div><p>See the products currently listed in the store.</p></div><div id="homeProducts" class="products" aria-live="polite" aria-busy="true"><div class="account-empty" role="status">Loading the collection…</div></div><div style="margin-top:30px"><a class="button-red" href="#shop" data-open-shop="all">View all pieces ↗</a></div></section>
 <section class="manifesto" id="about"><p>Clothing, footwear and accessories for <span>men and women.</span></p><small>STND. · Clothing and accessories</small></section>
 </main>
-<section class="shop-view" id="shopView" hidden><div class="shop-top"><button class="back-home" id="backHome">← Back to home</button><span>STND. / SHOP</span></div><div class="shop-intro"><p class="eyebrow">All products</p><h1>Shop<br><span>STND.</span></h1><p>Browse the clothing, footwear and accessories currently available.</p></div><div class="shop-tools"><div class="search-sort"><input class="search" id="productSearch" type="search" placeholder="Search products and categories…" autocomplete="off"><select class="sort" id="productSort" aria-label="Sort products"><option value="featured">Featured</option><option value="newest">Newest</option><option value="name-asc">Name A-Z</option><option value="price-asc">Price low to high</option><option value="price-desc">Price high to low</option></select></div><div class="filters" id="categoryFilters"><button class="filter active" data-category="all">All pieces</button><button class="filter" data-category="Men">Men</button><button class="filter" data-category="Women">Women</button><button class="filter" data-category="Footwear">Footwear</button><button class="filter" data-category="Accessories">Accessories</button><button class="filter" data-category="Clothing">Clothing</button></div></div><div class="results-head"><div><h2>Products</h2><span id="resultCount">Loading pieces…</span></div><span>USD / PRICES</span></div><div id="products" class="products"></div><div class="market-empty" id="marketEmpty" hidden>No pieces match that search. Try another category.</div></section>
-<div class="info-overlay" id="productInfo" role="dialog" aria-modal="true" aria-labelledby="productInfoTitle"><section class="info-panel"><div class="info-head"><div><p class="info-kicker">STND. / PRODUCT INFORMATION</p><h2 id="productInfoTitle">Piece details</h2></div><button class="close" type="button" data-close-info aria-label="Close details">×</button></div><div class="info-copy" id="productInfoBody"></div></section></div><div class="info-overlay" id="policyInfo" role="dialog" aria-modal="true" aria-labelledby="policyTitle"><section class="info-panel"><div class="info-head"><div><p class="info-kicker">STND. / STORE INFORMATION</p><h2 id="policyTitle">Store policy</h2></div><button class="close" type="button" data-close-info aria-label="Close policy">×</button></div><div class="info-copy" id="policyBody"></div></section></div><footer class="footer" id="footer"><div><div class="footer-brand">STND<span>.</span></div><p>Clothing and accessories for men and women.</p></div><div class="footer-links"><a href="#shop" data-open-shop="all">Shop</a><a href="#collections">Collections</a><a href="#privacy" data-policy="privacy">Privacy</a><a href="#terms" data-policy="terms">Terms</a><a href="#warranty" data-policy="warranty">Warranty</a><a href="#cookies" data-policy="cookies">Cookies</a><a href="#reviews" data-policy="reviews">Reviews</a></div><span>© 2026 STND. All rights reserved.</span></footer>
+<section class="shop-view" id="shopView" hidden><div class="shop-top"><button class="back-home" id="backHome">← Back to home</button><span>STND. / SHOP</span></div><div class="shop-intro"><p class="eyebrow">All products</p><h1>Shop<br><span>STND.</span></h1><p>Browse the clothing, footwear and accessories currently available.</p></div><div class="shop-tools"><div class="search-sort"><input class="search" id="productSearch" type="search" placeholder="Search products and categories…" autocomplete="off"><select class="sort" id="productSort" aria-label="Sort products"><option value="featured">Featured</option><option value="newest">Newest</option><option value="name-asc">Name A-Z</option><option value="price-asc">Price low to high</option><option value="price-desc">Price high to low</option></select></div><div class="filters" id="categoryFilters"><button class="filter active" data-category="all">All pieces</button><button class="filter" data-category="Men">Men</button><button class="filter" data-category="Women">Women</button><button class="filter" data-category="Footwear">Footwear</button><button class="filter" data-category="Accessories">Accessories</button><button class="filter" data-category="Clothing">Clothing</button></div></div><div class="results-head"><div><h2>Products</h2><span id="resultCount" aria-live="polite">Loading pieces…</span></div><span>USD / PRICES</span></div><div id="products" class="products" aria-live="polite" aria-busy="true"></div><div class="market-empty" id="marketEmpty" hidden>No pieces match that search. Try another category.</div></section>
+<div class="info-overlay" id="productInfo" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="productInfoTitle"><section class="info-panel" tabindex="-1"><div class="info-head"><div><p class="info-kicker">STND. / PRODUCT INFORMATION</p><h2 id="productInfoTitle">Piece details</h2></div><button class="close" type="button" data-close-info aria-label="Close details">×</button></div><div class="info-copy" id="productInfoBody"></div></section></div><div class="info-overlay" id="policyInfo" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="policyTitle"><section class="info-panel" tabindex="-1"><div class="info-head"><div><p class="info-kicker">STND. / STORE INFORMATION</p><h2 id="policyTitle">Store policy</h2></div><button class="close" type="button" data-close-info aria-label="Close policy">×</button></div><div class="info-copy" id="policyBody"></div></section></div><footer class="footer" id="footer"><div><div class="footer-brand">STND<span>.</span></div><p>Clothing and accessories for men and women.</p></div><div class="footer-links"><a href="#shop" data-open-shop="all">Shop</a><a href="#collections">Collections</a><a href="#privacy" data-policy="privacy">Privacy</a><a href="#terms" data-policy="terms">Terms</a><a href="#warranty" data-policy="warranty">Warranty</a><a href="#cookies" data-policy="cookies">Cookies</a><a href="#reviews" data-policy="reviews">Reviews</a></div><span>© 2026 STND. All rights reserved.</span></footer>
 <div class="backdrop" id="backdrop"></div><aside class="cart-panel" id="cartPanel" aria-label="Shopping bag"><div class="cart-top"><h2>Your bag</h2><button class="close" id="closeCart" aria-label="Close bag">×</button></div><div class="cart-items" id="items">Your bag is empty.</div><div class="cart-total"><div class="total-line"><span>Subtotal</span><strong>$<span id="total">0.00</span></strong></div><form class="checkout" id="checkout"><input name="name" placeholder="Full name" required><input name="email" type="email" placeholder="Email address" required><input name="address" placeholder="Delivery address" required><button class="button-red">Place order <span>→</span></button></form><p class="notice" id="message">Secure checkout powered by Pesepay. Your order is confirmed only after payment succeeds.</p></div></aside>
 <div class="account-backdrop" id="accountBackdrop"><section class="account-modal" role="dialog" aria-modal="true"><div class="account-head"><div><p class="eyebrow">STND. / YOUR ACCOUNT</p><h2>Your account</h2></div><button class="close" id="closeAccount">×</button></div><div id="accountBody"></div></section></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script><script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
@@ -111,16 +111,45 @@ function initSTNDMotion(){
    el.setAttribute('data-reveal','');
    gsap.fromTo(el,{y:38,opacity:0},{y:0,opacity:1,duration:.8,ease:'power3.out',scrollTrigger:{trigger:el,start:'top 88%',once:true}});
  });
- gsap.to('.ticker span',{xPercent:-22,ease:'none',duration:18,repeat:-1});
+ /* The announcement marquee is handled by CSS, so do not add a second transform. */
  gsap.utils.toArray('.category-card img,.drop-image img').forEach(img=>gsap.to(img,{yPercent:-5,ease:'none',scrollTrigger:{trigger:img,start:'top bottom',end:'bottom top',scrub:true}}));
 }
 window.addEventListener('load',initSTNDMotion,{once:true});
-let products=[],cart=[],currentUser=null,sellerProducts=[],authMode="login",activeCategory="all",activeSort="featured";
+let products=[],cart=[],currentUser=null,sellerProducts=[],authMode="login",activeCategory="all",activeSort="featured",productsLoadPromise=null,activeInfoDialog=null,infoDialogOpener=null,infoDialogInert=[],infoDialogOverflow="";
 const $=s=>document.querySelector(s),money=n=>Number(n||0).toFixed(2);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 async function api(url,options={}){const r=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({error:"Unexpected server response."}));if(!r.ok)throw Error(d.error||"Request failed.");return d}
 function productCard(p){return '<article class="product"><div class="product-image"><img src="'+esc(p.image)+'" alt="'+esc(p.name)+'" loading="lazy"><span class="product-tag">'+esc(p.category)+'</span></div><div class="product-meta"><div><h3>'+esc(p.name)+'</h3><p>'+esc(p.description)+'</p></div><span class="price">$'+money(p.price)+'</span></div><div class="product-bottom"><small>'+Number(p.stock)+' available</small><button class="add" data-add="'+p.id+'">Add to bag +</button></div><button class="product-details-link" type="button" data-view-product="'+p.id+'">Product details +</button></article>'}
-async function loadProducts(){try{products=await api("/api/products");renderProducts();$("#homeProducts").innerHTML=products.slice(0,4).map(productCard).join("")||'<div class="account-empty">The first collection is being prepared.</div>'}catch(e){$("#products").innerHTML='<div class="account-empty">'+esc(e.message)+'</div>';$("#homeProducts").textContent="The collection is temporarily unavailable."}}
+async function loadProducts(){
+ if(productsLoadPromise)return productsLoadPromise;
+ const home=$("#homeProducts"),list=$("#products"),count=$("#resultCount");
+ productsLoadPromise=(async()=>{
+  home.setAttribute("aria-busy","true");
+  list.setAttribute("aria-busy","true");
+  count.textContent="Loading pieces…";
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),45000);
+  try{
+   products=await api("/api/products",{signal:controller.signal});
+   renderProducts();
+   home.innerHTML=products.slice(0,4).map(productCard).join("")||'<div class="account-empty">The first collection is being prepared.</div>';
+  }catch(e){
+   const message=e.name==="AbortError"?"The store is taking longer than expected. Please try again.":(e.message||"The collection is temporarily unavailable.");
+   count.textContent="Collection unavailable";
+   $("#marketEmpty").hidden=true;
+   const retry='<div class="account-empty" role="alert">'+esc(message)+' <button class="button-red" type="button" data-retry-products>Try again</button></div>';
+   list.innerHTML=retry;
+   home.innerHTML=retry;
+  }finally{
+   clearTimeout(timeout);
+   home.setAttribute("aria-busy","false");
+   list.setAttribute("aria-busy","false");
+   productsLoadPromise=null;
+  }
+ })();
+ return productsLoadPromise;
+}
+document.addEventListener("click",e=>{if(e.target.closest("[data-retry-products]"))loadProducts()});
 function renderProducts(){const q=$("#productSearch").value.trim().toLowerCase();let filtered=products.filter(p=>(activeCategory==="all"||p.category===activeCategory||((activeCategory==="Men"||activeCategory==="Women")&&p.category==="Clothing"&&p.audience===activeCategory))&&(!q||[p.name,p.description,p.category,p.seller_name].join(" ").toLowerCase().includes(q)));const sorts={featured:(a,b)=>b.id-a.id,newest:(a,b)=>b.id-a.id,"name-asc":(a,b)=>a.name.localeCompare(b.name),"price-asc":(a,b)=>a.price-b.price,"price-desc":(a,b)=>b.price-a.price};filtered.sort(sorts[activeSort]||sorts.featured);$("#resultCount").textContent=filtered.length+" "+(filtered.length===1?"piece":"pieces");$("#marketEmpty").hidden=filtered.length>0;$("#products").innerHTML=filtered.map(productCard).join("");}
 function showShop(category="all"){activeCategory=category;$("#home").hidden=true;$("#shopView").hidden=false;$("#navlinks").classList.remove("open");window.scrollTo({top:0,behavior:"smooth"});if(!products.length)loadProducts();else renderProducts();document.querySelectorAll("[data-category]").forEach(b=>b.classList.toggle("active",b.dataset.category===category))}
 function showHome(){$("#home").hidden=false;$("#shopView").hidden=true;window.scrollTo({top:0,behavior:"smooth"})}
@@ -157,12 +186,38 @@ async function loadBuyerOrders(){try{const orders=await api("/api/orders");$("#b
 function initTermsNotice(){
  const notice=$("#termsOverlay"),accept=$("#termsAccept");
  if(!notice||!accept)return;
- let accepted=false;
+ let accepted=false,isOpen=false,previousFocus=document.activeElement,previousOverflow=document.body.style.overflow;
+ let inertSnapshot=[];
  try{accepted=localStorage.getItem("stndNoticeAccepted")==="yes"}catch{}
- if(!accepted)notice.classList.add("open");
+ if(!accepted){
+  isOpen=true;
+  notice.classList.add("open");
+  notice.setAttribute("aria-hidden","false");
+  inertSnapshot=[...document.body.children].filter(node=>node!==notice).map(node=>[node,node.inert]);
+  inertSnapshot.forEach(([node])=>{node.inert=true});
+  document.body.style.overflow="hidden";
+  requestAnimationFrame(()=>accept.focus({preventScroll:true}));
+ }else{
+  notice.setAttribute("aria-hidden","true");
+ }
+ notice.addEventListener("keydown",e=>{
+  if(!isOpen||e.key!=="Tab")return;
+  const tabbable=[...notice.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>!el.hidden);
+  if(!tabbable.length){e.preventDefault();notice.querySelector(".terms-card")?.focus();return}
+  const first=tabbable[0],last=tabbable[tabbable.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+ });
  accept.addEventListener("click",()=>{
+  if(!isOpen)return;
   try{localStorage.setItem("stndNoticeAccepted","yes")}catch{}
+  isOpen=false;
   notice.classList.remove("open");
+  notice.setAttribute("aria-hidden","true");
+  document.body.style.overflow=previousOverflow;
+  inertSnapshot.forEach(([node,wasInert])=>{node.inert=wasInert});
+  const target=previousFocus&&previousFocus!==document.body&&previousFocus.isConnected?previousFocus:$("#openAccount")||$(".brand");
+  target?.focus({preventScroll:true});
  });
 }
 initTermsNotice();
@@ -173,17 +228,58 @@ privacy:{title:"Privacy policy",html:"<p><strong>Last updated: 20 November 2026<
 terms:{title:"Terms and conditions",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Using the store</h3><p>Use the storefront lawfully and provide accurate account, delivery and checkout information.</p><h3>Products, prices and availability</h3><p>Descriptions, images, prices and stock are provided for guidance and may be corrected or updated. Screen settings can affect colours. An item in your bag is not reserved until an order is accepted.</p><h3>Orders and payment</h3><p>Submitting checkout starts an order and payment process. An order is treated as paid only after the payment provider confirms a successful transaction. A redirect or reference number alone is not proof of payment. If payment fails or remains pending, do not assume the order is confirmed.</p><h3>Returns and consumer rights</h3><p>Any return, exchange or refund arrangement must be confirmed with STND. These terms do not remove consumer rights that apply under relevant law.</p><h3>Changes</h3><p>Store content and these terms may be updated. The version displayed here applies when you use the storefront.</p>"},
 cookies:{title:"Cookie policy",html:"<p><strong>Last updated: 20 November 2026</strong></p><h3>Essential cookies</h3><p>STND. uses a session cookie to keep a signed-in account working and support secure account actions. This cookie is necessary for core account functionality.</p><h3>Other tracking</h3><p>The storefront is not intended to use advertising cookies or cross-site tracking cookies. Third-party services, including hosted payment pages, may apply their own cookies under their own policies.</p><h3>Managing cookies</h3><p>You can block or clear cookies in browser settings. If you block essential cookies, sign-in and account features may not work correctly.</p>"}
 };
-function closeInfo(){document.querySelectorAll(".info-overlay.open").forEach(el=>el.classList.remove("open"))}
-function openPolicy(key){const page=policyContent[key];if(!page)return;$("#policyTitle").textContent=page.title;$("#policyBody").innerHTML=page.html;$("#policyInfo").classList.add("open")}
-function openProductInfo(id){const p=products.find(x=>Number(x.id)===Number(id));if(!p)return;$("#productInfoTitle").textContent=p.name;$("#productInfoBody").innerHTML="<p>"+esc(p.description||"No additional description has been provided for this product.")+"</p><p class='info-product-price'>$"+money(p.price)+"</p><h3>Product details</h3><p>Category: "+esc(p.category||"Not specified")+". Availability: "+Number(p.stock||0)+" currently listed.</p><h3>Care and warranty</h3><p>Follow any care instructions supplied with the item. Warranty coverage is product-specific and is only included where stated on the product listing or supplied by the manufacturer or supplier. Contact STND. before ordering if you need confirmation.</p><h3>Reviews</h3><p>Customer reviews are not currently available for this item. We do not display unverified ratings or testimonials.</p><div class='info-actions'><button class='button-red' type='button' data-add-from-details='"+p.id+"'>Add to bag +</button></div>";$("#productInfo").classList.add("open")}
+function openInfoDialog(selector,trigger){
+ const dialog=$(selector);
+ if(!dialog)return;
+ if(activeInfoDialog)closeInfo(false);
+ infoDialogOpener=trigger||document.activeElement;
+ activeInfoDialog=dialog;
+ infoDialogOverflow=document.body.style.overflow;
+ infoDialogInert=[...document.body.children].filter(node=>node!==dialog).map(node=>[node,node.inert]);
+ infoDialogInert.forEach(([node])=>{node.inert=true});
+ document.body.style.overflow="hidden";
+ dialog.setAttribute("aria-hidden","false");
+ dialog.classList.add("open");
+ requestAnimationFrame(()=>{const target=dialog.querySelector("[data-close-info]")||dialog.querySelector(".info-panel");target?.focus({preventScroll:true})});
+}
+function closeInfo(restoreFocus=true){
+ if(!activeInfoDialog)return;
+ const closing=activeInfoDialog;
+ closing.classList.remove("open");
+ closing.setAttribute("aria-hidden","true");
+ activeInfoDialog=null;
+ document.body.style.overflow=infoDialogOverflow;
+ infoDialogInert.forEach(([node,wasInert])=>{node.inert=wasInert});
+ infoDialogInert=[];
+ const target=infoDialogOpener;
+ infoDialogOpener=null;
+ if(restoreFocus&&target&&target.isConnected&&!target.inert)target.focus({preventScroll:true});
+}
+function trapInfoDialogFocus(e){
+ if(!activeInfoDialog||e.key!=="Tab")return;
+ const tabbable=[...activeInfoDialog.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>!el.hidden);
+ if(!tabbable.length){e.preventDefault();activeInfoDialog.querySelector(".info-panel")?.focus();return}
+ const first=tabbable[0],last=tabbable[tabbable.length-1];
+ if(e.shiftKey&&(document.activeElement===first||!activeInfoDialog.contains(document.activeElement))){e.preventDefault();last.focus()}
+ else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+}
+function openPolicy(key,trigger){const page=policyContent[key];if(!page)return;$("#policyTitle").textContent=page.title;$("#policyBody").innerHTML=page.html;openInfoDialog("#policyInfo",trigger)}
+function openProductInfo(id,trigger){const p=products.find(x=>Number(x.id)===Number(id));if(!p)return;$("#productInfoTitle").textContent=p.name;$("#productInfoBody").innerHTML="<p>"+esc(p.description||"No additional description has been provided for this product.")+"</p><p class='info-product-price'>$"+money(p.price)+"</p><h3>Product details</h3><p>Category: "+esc(p.category||"Not specified")+". Availability: "+Number(p.stock||0)+" currently listed.</p><h3>Care and warranty</h3><p>Follow any care instructions supplied with the item. Warranty coverage is product-specific and is only included where stated on the product listing or supplied by the manufacturer or supplier. Contact STND. before ordering if you need confirmation.</p><h3>Reviews</h3><p>Customer reviews are not currently available for this item. We do not display unverified ratings or testimonials.</p><div class='info-actions'><button class='button-red' type='button' data-add-from-details='"+p.id+"'>Add to bag +</button></div>";openInfoDialog("#productInfo",trigger)}
 document.addEventListener("click",e=>{
- const policy=e.target.closest("[data-policy]");if(policy){e.preventDefault();openPolicy(policy.dataset.policy);return}
- const detail=e.target.closest("[data-view-product]");if(detail){openProductInfo(detail.dataset.viewProduct);return}
+ const policy=e.target.closest("[data-policy]");if(policy){e.preventDefault();openPolicy(policy.dataset.policy,policy);return}
+ const detail=e.target.closest("[data-view-product]");if(detail){openProductInfo(detail.dataset.viewProduct,detail);return}
  const addDetail=e.target.closest("[data-add-from-details]");if(addDetail){const p=products.find(x=>Number(x.id)===Number(addDetail.dataset.addFromDetails));if(!p)return;const item=cart.find(x=>x.id===p.id);if(item){if(item.quantity>=p.stock){$("#message").textContent="You've reached the available stock.";return}item.quantity++}else cart.push({id:p.id,quantity:1});renderCart();$("#message").textContent="Added to your bag.";closeInfo();return}
  if(e.target.closest("[data-close-info]")||e.target.classList.contains("info-overlay"))closeInfo();
 });
 $("#menuToggle").onclick=()=>$("#navlinks").classList.toggle("open");
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){accountOpen(false);cartPanel(false)}});
+document.addEventListener("keydown",e=>{
+ if(activeInfoDialog){
+  if(e.key==="Escape"){closeInfo();return}
+  trapInfoDialogFocus(e);
+  return;
+ }
+ if(e.key==="Escape"){accountOpen(false);cartPanel(false)}
+});
 async function handlePaymentReturn(){
  const params=new URLSearchParams(location.search);
  if(params.get("payment")!=="return")return;
