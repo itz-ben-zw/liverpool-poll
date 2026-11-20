@@ -41,6 +41,7 @@ Open http://localhost:3000.
 ## Store capabilities
 
 - Responsive STND. storefront, product listings, search and category filters
+- Animated clothing colour rack with per-size variant stock, front/back imagery and variant-aware checkout
 - Shopping bag and checkout
 - Guest checkout without an account
 - Optional customer sign-up or existing-customer login during checkout
@@ -87,8 +88,9 @@ Never commit real credentials to GitHub or paste them into source files.
 
 ## Current limitations
 
-- Product stock is tracked at product level in checkout; full size/colour variant selection and variant-level checkout stock still need to be wired into the storefront.
-- Product image upload and managed cloud media storage are not implemented yet.
+- The colour rack is data-driven: add colour/size SKUs and front/back image URLs in the private product editor before it appears on a product. The existing demonstration catalogue currently has no configured colour/size variants.
+- Variant stock is checked and deducted at checkout. Product-only listings continue to use product-level stock.
+- Variant front/back photos use HTTPS image URLs; managed per-variant image upload is not yet included in the editor.
 - Pesepay must be validated with a complete sandbox transaction before being treated as production-ready.
 - Delivery rules, returns, tax, email notifications, fraud controls and customer support workflows still need implementation.
 - The six launch products and imagery are demonstration content, not confirmed supplier inventory or licensed campaign assets.
