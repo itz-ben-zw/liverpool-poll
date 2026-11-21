@@ -238,6 +238,8 @@ app.get("/payment/return",(req,res)=>res.redirect("/?payment=return&order="+enco
 app.get("/api/orders",auth,asyncRoute(async(req,res)=>{const r=await pool.query("select id,total,status,payment_status,created_at from public.orders where user_id=$1 order by created_at desc,id desc",[req.user.id]);res.json(r.rows.map(x=>({...x,id:Number(x.id),total:Number(x.total)})));}));
 app.get("/api/orders/guest/:id",asyncRoute(async(req,res)=>{const token=String(req.query.token||"");if(!token)return res.status(400).json({error:"Guest order token required."});const r=await pool.query("select id,total,status,payment_status,created_at,shipping_name,shipping_email from public.orders where id=$1 and guest_token_hash=$2",[Number(req.params.id),hash(token)]);if(!r.rowCount)return res.status(404).json({error:"Order not found."});res.json({...r.rows[0],id:Number(r.rows[0].id),total:Number(r.rows[0].total)});}));
 
+app.get("/sitemap.xml",(req,res)=>res.type("application/xml").send('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>https://stnd-store.onrender.com/</loc>\n  </url>\n</urlset>'));
+app.get("/robots.txt",(req,res)=>res.type("text/plain").send('User-agent: *\nAllow: /\n\nDisallow: /api/\n\nSitemap: https://stnd-store.onrender.com/sitemap.xml\n'));
 app.use(express.static(path.join(__dirname,"public"), { maxAge: "1h", etag: true }));
 app.use("/api/*",(req,res)=>res.status(404).json({error:"API route not found."}));
 app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
