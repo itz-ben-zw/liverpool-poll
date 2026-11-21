@@ -75,7 +75,7 @@
 </div>
 <header class="nav"><a class="brand" href="#" aria-label="STND home">STND<span>.</span></a><nav class="navlinks" id="navlinks"><a href="#shop" data-open-shop="all">Shop all</a><a href="#shop" data-open-shop="Men">Men</a><a href="#shop" data-open-shop="Women">Women</a><a href="#collections">Categories</a><a href="#about">About</a></nav><div class="navright"><button class="nav-action" id="openAccount">Account ↗</button><button class="nav-action" id="openCart">Bag <span class="bag-count" id="count">0</span></button><button class="menu-toggle" id="menuToggle" aria-label="Open navigation">☰</button></div></header>
 <main id="home">
-<section class="hero"><div class="hero-copy"><p class="eyebrow">Clothing and accessories</p><h1>Everyday<br><span>pieces.</span></h1><p>Clothing, footwear and accessories for men and women. Browse the current range and find pieces that work with what you already own.</p><a class="button-red" href="#shop" data-open-shop="all">Shop the collection <span>↗</span></a><div class="hero-index">MEN &nbsp; / &nbsp; WOMEN &nbsp; / &nbsp; ACCESSORIES</div></div><div class="hero-image"><img src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=1600&q=90" alt="Contemporary fashion editorial campaign"><div class="hero-image-label">STND. · CURRENT COLLECTION</div></div></section>
+<section class="hero"><div class="hero-copy"><p class="eyebrow">Clothing and accessories</p><h1>Everyday<br><span>pieces.</span></h1><p>Clothing, footwear and accessories for men and women. Browse the current range and find pieces that work with what you already own.</p><button class="button-red" id="heroShopCollection" type="button">Shop the collection <span>↗</span></button><div class="hero-index">MEN &nbsp; / &nbsp; WOMEN &nbsp; / &nbsp; ACCESSORIES</div></div><div class="hero-image"><img src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=1600&q=90" alt="Contemporary fashion editorial campaign"><div class="hero-image-label">STND. · CURRENT COLLECTION</div></div></section>
 <div class="ticker" role="region" aria-label="STND. store categories"><div class="ticker-track"><div class="ticker-group"><span>Clothing for men and women</span><b>·</b><span>Footwear</span><b>·</b><span>Bags and accessories</span><b>·</b></div><div class="ticker-group" aria-hidden="true"><span>Clothing for men and women</span><b>·</b><span>Footwear</span><b>·</b><span>Bags and accessories</span><b>·</b></div></div></div>
 <section class="section" id="collections"><div class="section-head"><div><p class="eyebrow">Shop by category</p><h2>Browse<br>the range.</h2></div><p>Browse clothing and accessories by category.</p></div><div class="categories">
 <a class="category-card" href="#shop" data-open-shop="Men"><img src="https://bazaar.town/wp-content/uploads/2024/09/COS-AW24-CAMPAIGN_AIDAN-BISSET_01.jpg" alt="Men's contemporary fashion editorial in oversized black tailoring"><span class="category-copy"><small>Clothing and footwear</small><strong>Men <span>↗</span></strong></span></a>
@@ -131,8 +131,16 @@ let products=INITIAL_CATALOG.map(p=>({...p})),cart=[],currentUser=null,sellerPro
 const $=s=>document.querySelector(s),money=n=>Number(n||0).toFixed(2);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 async function api(url,options={}){const r=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({error:"Unexpected server response."}));if(!r.ok)throw Error(d.error||"Request failed.");return d}
+const CATALOG_IMAGE_FALLBACKS={
+ 1:"https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=900&q=85",
+ 2:"https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=900&q=85",
+ 3:"https://images.unsplash.com/photo-1627225924765-552d49cf17ad?w=900&q=85",
+ 4:"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=900&q=85",
+ 5:"https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=900&q=85",
+ 6:"https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=900&q=85"
+};
 function productImages(p){
- const raw=[p?.image,...(Array.isArray(p?.images)?p.images:[])];
+ const raw=[p?.image,...(Array.isArray(p?.images)?p.images:[]),CATALOG_IMAGE_FALLBACKS[Number(p?.id)]];
  return [...new Set(raw.filter(v=>typeof v==="string"&&/^https?:\/\//i.test(v.trim())).map(v=>v.trim()))];
 }
 function productCard(p){
@@ -174,6 +182,7 @@ document.addEventListener("click",e=>{if(e.target.closest("[data-retry-products]
 function renderProducts(){const q=$("#productSearch").value.trim().toLowerCase(),min=$("#priceMin")?.value===""?0:Number($("#priceMin")?.value||0),max=$("#priceMax")?.value===""?Infinity:Number($("#priceMax")?.value);let filtered=products.filter(p=>(activeCategory==="all"||p.category===activeCategory||((activeCategory==="Men"||activeCategory==="Women")&&p.category==="Clothing"&&p.audience===activeCategory))&&(!q||[p.name,p.description,p.category,p.seller_name].join(" ").toLowerCase().includes(q))&&Number(p.price)>=min&&Number(p.price)<=max);const sorts={featured:(a,b)=>Number(b.featured)-Number(a.featured)||b.id-a.id,popular:(a,b)=>Number(b.popularity||0)-Number(a.popularity||0)||b.id-a.id,newest:(a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)||b.id-a.id,"name-asc":(a,b)=>a.name.localeCompare(b.name),"price-asc":(a,b)=>a.price-b.price,"price-desc":(a,b)=>b.price-a.price};filtered.sort(sorts[activeSort]||sorts.featured);$("#resultCount").textContent=filtered.length+" "+(filtered.length===1?"piece":"pieces");$("#marketEmpty").hidden=filtered.length>0;$("#products").innerHTML=filtered.map(productCard).join("");}
 function showShop(category="all"){activeCategory=category;$("#home").hidden=true;$("#shopView").hidden=false;$("#navlinks").classList.remove("open");window.scrollTo({top:0,behavior:"smooth"});if(!products.length)loadProducts();else renderProducts();document.querySelectorAll("[data-category]").forEach(b=>b.classList.toggle("active",b.dataset.category===category))}
 function showHome(){$("#home").hidden=false;$("#shopView").hidden=true;window.scrollTo({top:0,behavior:"smooth"})}
+document.getElementById("heroShopCollection")?.addEventListener("click",e=>{e.preventDefault();showShop("all")});
 document.addEventListener("click",e=>{const link=e.target.closest("[data-open-shop]");if(link){e.preventDefault();showShop(link.dataset.openShop||"all")}});
 /* Keep in-page navigation reliable on desktop and mobile. */
 document.addEventListener("click",e=>{
