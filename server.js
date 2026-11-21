@@ -238,6 +238,7 @@ app.get("/payment/return",(req,res)=>res.redirect("/?payment=return&order="+enco
 app.get("/api/orders",auth,asyncRoute(async(req,res)=>{const r=await pool.query("select id,total,status,payment_status,created_at from public.orders where user_id=$1 order by created_at desc,id desc",[req.user.id]);res.json(r.rows.map(x=>({...x,id:Number(x.id),total:Number(x.total)})));}));
 app.get("/api/orders/guest/:id",asyncRoute(async(req,res)=>{const token=String(req.query.token||"");if(!token)return res.status(400).json({error:"Guest order token required."});const r=await pool.query("select id,total,status,payment_status,created_at,shipping_name,shipping_email from public.orders where id=$1 and guest_token_hash=$2",[Number(req.params.id),hash(token)]);if(!r.rowCount)return res.status(404).json({error:"Order not found."});res.json({...r.rows[0],id:Number(r.rows[0].id),total:Number(r.rows[0].total)});}));
 
+app.use(express.static(path.join(__dirname,"public"), { maxAge: "1h", etag: true }));
 app.use("/api/*",(req,res)=>res.status(404).json({error:"API route not found."}));
 app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
 app.use((err,req,res,next)=>{console.error("[api] request failed:",err.code||err.message);if(res.headersSent)return next(err);res.status(500).json({error:"Something went wrong. Please try again."});});
