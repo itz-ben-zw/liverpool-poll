@@ -106,6 +106,27 @@ async function restoreOrder(orderId){
   try{await c.query("begin");const changed=await c.query("update public.orders set status='payment_failed',payment_status='failed',updated_at=now() where id=$1 and payment_status='pending' returning id",[orderId]);if(changed.rowCount){const rows=await c.query("select product_id,quantity from public.order_items where order_id=$1",[orderId]);for(const i of rows.rows)await c.query("update public.products set stock=stock+$1,updated_at=now() where id=$2",[i.quantity,i.product_id]);}await c.query("commit");}
   catch(e){await c.query("rollback");console.error("[orders] stock restore failed:",e.code||"unknown");}finally{c.release();}
 }
+async function recordDemoPayment(orderId,method,outcome){
+  const c=await pool.connect();
+  const reference="STND-"+method.toUpperCase()+"-"+orderId+"-"+crypto.randomBytes(4).toString("hex").toUpperCase();
+  try{
+    await c.query("begin");
+    const found=await c.query("select id,payment_status from public.orders where id=$1 for update",[orderId]);
+    if(!found.rowCount)throw Error("Order not found.");
+    if(found.rows[0].payment_status==="paid"){await c.query("commit");return {status:"paid",reference};}
+    if(outcome==="success"){
+      await c.query("update public.orders set payment_reference=$1,payment_provider=$2,status='paid',payment_status='paid',updated_at=now() where id=$3",[reference,method,orderId]);
+    }else{
+      const changed=await c.query("update public.orders set payment_reference=$1,payment_provider=$2,status='payment_failed',payment_status='failed',updated_at=now() where id=$3 and payment_status='pending' returning id",[reference,method,orderId]);
+      if(changed.rowCount){
+        const rows=await c.query("select product_id,quantity from public.order_items where order_id=$1",[orderId]);
+        for(const item of rows.rows)await c.query("update public.products set stock=stock+$1,updated_at=now() where id=$2",[item.quantity,item.product_id]);
+      }
+    }
+    await c.query("commit");
+    return {status:outcome==="success"?"paid":"failed",reference};
+  }catch(e){await c.query("rollback");throw e;}finally{c.release();}
+}
 
 app.post("/api/admin/uploads",auth,adminOnly,express.raw({type:["image/jpeg","image/png","image/webp","image/avif"],limit:"10mb"}),asyncRoute(async(req,res)=>{
   if(!SUPABASE_SERVICE_ROLE_KEY)return res.status(503).json({error:"Image uploads are not configured. Add SUPABASE_SERVICE_ROLE_KEY to Render."});
@@ -185,8 +206,11 @@ app.delete(["/api/admin/products/:id","/api/seller/products/:id"],auth,adminOnly
 app.get(["/api/admin/orders","/api/seller/orders"],auth,adminOnly,asyncRoute(async(req,res)=>{const r=await pool.query("select o.id,o.status,o.payment_status,o.total,o.created_at,c.name customer_name,c.email customer_email,oi.product_id,oi.quantity,oi.unit_price,coalesce(oi.product_name,p.name) product_name from public.orders o join public.customers c on c.id=o.customer_id join public.order_items oi on oi.order_id=o.id left join public.products p on p.id=oi.product_id order by o.created_at desc,o.id desc");res.json(r.rows.map(x=>({...x,id:Number(x.id),product_id:Number(x.product_id),quantity:Number(x.quantity),total:Number(x.total),unit_price:Number(x.unit_price)})));}));
 
 app.post("/api/checkout",asyncRoute(async(req,res)=>{
-  const {customer={},items,accountMode="guest",password}=req.body||{},name=String(customer.name||"").trim(),email=String(customer.email||"").trim().toLowerCase(),phone=String(customer.phone||"").trim(),address=String(customer.address||"").trim();
+  const {customer={},items,accountMode="guest",password,paymentMethod="card",paymentOutcome="success"}=req.body||{},name=String(customer.name||"").trim(),email=String(customer.email||"").trim().toLowerCase(),phone=String(customer.phone||"").trim(),address=String(customer.address||"").trim();
   if(!validText(name,100)||!validEmail(email)||!validText(address,500)||!Array.isArray(items)||!items.length||items.length>50)return res.status(400).json({error:"Enter your name, email, delivery address and add items to your bag."});
+  if(!["card","ecocash","onemoney","pesepay"].includes(paymentMethod))return res.status(400).json({error:"Choose a valid payment method."});
+  if(!["success","failed"].includes(paymentOutcome))return res.status(400).json({error:"Choose a valid payment response."});
+  if(paymentMethod==="pesepay"&&!payReady())return res.status(503).json({error:"Pesepay is not configured. Choose card, EcoCash or OneMoney."});
   if(!["guest","signup","login"].includes(accountMode))return res.status(400).json({error:"Choose guest checkout, sign up or sign in."});
   if(accountMode!=="guest"&&(typeof password!=="string"||password.length<8||password.length>200))return res.status(400).json({error:"Enter your password (at least 8 characters)."});
   const c=await pool.connect();let orderId=null,sessionToken=null,guestToken=null,total=0;
@@ -199,11 +223,12 @@ app.post("/api/checkout",asyncRoute(async(req,res)=>{
     const verified=[];for(const [id,q] of quantities){const r=await c.query("select id,name,price,stock,status from public.products where id=$1 for update",[id]);const p=r.rows[0];if(!p||p.status!=="active")throw Object.assign(Error("A product in your bag is no longer available."),{status:409});if(Number(p.stock)<q)throw Object.assign(Error("Not enough stock for "+p.name+". Available: "+p.stock+"."),{status:409});total+=Number(p.price)*q;verified.push({p,q});}
     const customerRow=await c.query("insert into public.customers(name,email,address,phone) values($1,$2,$3,$4) on conflict(email) do update set name=excluded.name,address=excluded.address,phone=excluded.phone returning id",[name,email,address,phone||null]);
     guestToken=user?null:crypto.randomBytes(32).toString("base64url");
-    const order=await c.query("insert into public.orders(customer_id,user_id,total,status,payment_status,shipping_name,shipping_email,shipping_phone,shipping_address,guest_token_hash) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id",[customerRow.rows[0].id,user?user.id:null,total,payReady()?"pending_payment":"placed",payReady()?"pending":"unpaid",name,email,phone||null,address,guestToken?hash(guestToken):null]);orderId=Number(order.rows[0].id);
+    const order=await c.query("insert into public.orders(customer_id,user_id,total,status,payment_status,shipping_name,shipping_email,shipping_phone,shipping_address,guest_token_hash) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id",[customerRow.rows[0].id,user?user.id:null,total,"pending_payment","pending",name,email,phone||null,address,guestToken?hash(guestToken):null]);orderId=Number(order.rows[0].id);
     for(const x of verified){await c.query("insert into public.order_items(order_id,product_id,quantity,unit_price,product_name) values($1,$2,$3,$4,$5)",[orderId,x.p.id,x.q,x.p.price,x.p.name]);const dec=await c.query("update public.products set stock=stock-$1,updated_at=now() where id=$2 and stock >= $1",[x.q,x.p.id]);if(!dec.rowCount)throw Object.assign(Error("Stock changed while checking out. Please review your bag."),{status:409});}
     await c.query("commit");if(sessionToken)setCookie(res,sessionToken);
-    if(payReady()){try{const p=await startPayment(orderId,total);return res.status(201).json({message:"Continue to secure payment.",orderId,total,checkoutUrl:p.redirectUrl,accountCreated:accountMode==="signup"});}catch(e){await restoreOrder(orderId);throw Object.assign(Error("We couldn't start payment. No payment was taken and reserved stock has been released."),{status:502});}}
-    return res.status(201).json({message:"Your order has been received. Payment is pending confirmation by STND.",orderId,total,checkoutUrl:null,orderStatus:"placed",guestAccessToken:guestToken,accountCreated:accountMode==="signup"});
+    if(paymentMethod==="pesepay"){try{const p=await startPayment(orderId,total);return res.status(201).json({message:"Continue to secure payment.",orderId,total,checkoutUrl:p.redirectUrl,accountCreated:accountMode==="signup"});}catch(e){await restoreOrder(orderId);throw Object.assign(Error("We couldn't start payment. No payment was taken and reserved stock has been released."),{status:502});}}
+    const payment=await recordDemoPayment(orderId,"demo_"+paymentMethod,paymentOutcome);
+    return res.status(201).json({message:payment.status==="paid"?"Payment confirmed. Your order is complete.":"Payment was unsuccessful. Your order was not confirmed.",orderId,total,checkoutUrl:null,paymentStatus:payment.status,paymentReference:payment.reference,paymentMethod,guestAccessToken:guestToken,accountCreated:accountMode==="signup"});
   }catch(e){try{await c.query("rollback");}catch{}if(e.code==="23505")return res.status(409).json({error:"An account with that email already exists. Choose sign in instead."});if(e.status)return res.status(e.status).json({error:e.message});throw e;}finally{c.release();}
 }));
 
