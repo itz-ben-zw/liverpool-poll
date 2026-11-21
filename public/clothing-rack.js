@@ -16,7 +16,7 @@ if(typeof nativeOpen==="function")window.openProductInfo=function(id,trigger){
  initRack(product,colours);
 };
 function renderSingleProductRack(product,body){
- const images=[product.image,...(Array.isArray(product.images)?product.images:[])].filter((url,index,all)=>typeof url==="string"&&/^https?:\/\//i.test(url.trim())&&all.indexOf(url)===index);
+ const images=typeof productImages==="function"?productImages(product):[product.image,...(Array.isArray(product.images)?product.images:[])].filter((url,index,all)=>typeof url==="string"&&/^https?:\/\//i.test(url.trim())&&all.indexOf(url)===index);
  const image=images[0]||"";
  const original=body.innerHTML;
  const available=Math.max(0,Number(product.stock)||0);
