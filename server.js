@@ -28,12 +28,43 @@ const payReady = () => Boolean(PAY_KEY && PAY_ENCRYPTION.length === 32);
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false }));
+app.use(express.static(path.join(__dirname, "public"), {
+  etag: true,
+  maxAge: 0,
+  setHeaders(res, filePath) {
+    if (/\.(?:css|js)$/i.test(filePath)) res.setHeader("Cache-Control", "no-cache");
+  }
+}));
 
 const validText = (v, n=500) => typeof v === "string" && v.trim().length > 0 && v.trim().length <= n;
 const validEmail = v => typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const hash = v => crypto.createHash("sha256").update(v).digest("hex");
 const cleanUser = u => u && ({ id:Number(u.id), name:u.name, email:u.email, role:u.role, createdAt:u.created_at, address:u.address || "", phone:u.phone || "" });
 const cleanProduct = p => ({ ...p, images:Array.isArray(p.images)?p.images:(p.image?[p.image]:[]), id:Number(p.id), price:Number(p.price), stock:Number(p.stock), featured:Boolean(p.featured), active:p.status === "active" });
+const isHttpUrl = value => { if(typeof value !== "string") return false; try { const parsed = new URL(value); return parsed.protocol === "http:" || parsed.protocol === "https:"; } catch { return false; } };
+async function getVariantsForProducts(productIds, client=pool) {
+  const ids=[...new Set((productIds||[]).map(Number).filter(Number.isSafeInteger))];
+  if(!ids.length)return new Map();
+  const variants=await client.query("select id,product_id,sku,size,colour,stock,price_adjustment from public.product_variants where product_id=any($1::bigint[]) and active=true order by id",[ids]);
+  const variantIds=variants.rows.map(v=>Number(v.id));
+  const imageRows=variantIds.length?await client.query("select variant_id,image_url,alt_text,view_type,sort_order from public.product_images where variant_id=any($1::bigint[]) order by sort_order,id",[variantIds]):{rows:[]};
+  const imageMap=new Map();
+  for(const image of imageRows.rows){const id=Number(image.variant_id),list=imageMap.get(id)||[];list.push(image);imageMap.set(id,list);}
+  const result=new Map();
+  for(const row of variants.rows){
+    const id=Number(row.id),pid=Number(row.product_id),images=imageMap.get(id)||[];
+    const item={id,sku:row.sku,size:row.size||"One Size",colour:row.colour||"Unspecified",stock:Number(row.stock),priceAdjustment:Number(row.price_adjustment||0),frontImage:images.find(x=>x.view_type==="front")?.image_url||images[0]?.image_url||null,backImage:images.find(x=>x.view_type==="back")?.image_url||null,images:images.map(x=>({url:x.image_url,viewType:x.view_type,alt:x.alt_text||""}))};
+    const list=result.get(pid)||[];
+    let colour=list.find(x=>x.name.toLowerCase()===item.colour.toLowerCase());
+    if(!colour){colour={name:item.colour,stock:0,frontImage:item.frontImage,backImage:item.backImage,sizes:[]};list.push(colour);}
+    colour.stock+=item.stock;
+    if(!colour.frontImage&&item.frontImage)colour.frontImage=item.frontImage;
+    if(!colour.backImage&&item.backImage)colour.backImage=item.backImage;
+    colour.sizes.push(item);
+    result.set(pid,list);
+  }
+  return result;
+}
 const passwordHash = (p, salt=crypto.randomBytes(16).toString("hex")) => salt + ":" + crypto.scryptSync(p,salt,64).toString("hex");
 function passwordMatches(p, stored) {
   if (!stored) return false;
@@ -96,14 +127,14 @@ async function settlePayment(data){
     if(data.transactionStatus==="SUCCESS"){await c.query("update public.orders set status='paid',payment_status='paid',updated_at=now() where id=$1",[o.id]);}
     else if(["FAILED","CANCELLED","REVERSED","EXPIRED"].includes(String(data.transactionStatus||"").toUpperCase())){
       const changed=await c.query("update public.orders set status='payment_failed',payment_status='failed',updated_at=now() where id=$1 and payment_status='pending' returning id",[o.id]);
-      if(changed.rowCount){const items=await c.query("select product_id,quantity from public.order_items where order_id=$1",[o.id]);for(const i of items.rows)await c.query("update public.products set stock=stock+$1,updated_at=now() where id=$2",[i.quantity,i.product_id]);}
+      if(changed.rowCount){const items=await c.query("select product_id,variant_id,quantity from public.order_items where order_id=$1",[o.id]);for(const i of items.rows){if(i.variant_id){await c.query("update public.product_variants set stock=stock+$1,updated_at=now() where id=$2",[i.quantity,i.variant_id]);await c.query("update public.products set stock=coalesce((select sum(stock) from public.product_variants where product_id=$1 and active=true),0),updated_at=now() where id=$1",[i.product_id]);}else await c.query("update public.products set stock=stock+$1,updated_at=now() where id=$2",[i.quantity,i.product_id]);}}
     }
     await c.query("commit");return {status:data.transactionStatus||"PENDING",orderId:Number(o.id)};
   }catch(e){await c.query("rollback");throw e;}finally{c.release();}
 }
 async function restoreOrder(orderId){
   const c=await pool.connect();
-  try{await c.query("begin");const changed=await c.query("update public.orders set status='payment_failed',payment_status='failed',updated_at=now() where id=$1 and payment_status='pending' returning id",[orderId]);if(changed.rowCount){const rows=await c.query("select product_id,quantity from public.order_items where order_id=$1",[orderId]);for(const i of rows.rows)await c.query("update public.products set stock=stock+$1,updated_at=now() where id=$2",[i.quantity,i.product_id]);}await c.query("commit");}
+  try{await c.query("begin");const changed=await c.query("update public.orders set status='payment_failed',payment_status='failed',updated_at=now() where id=$1 and payment_status='pending' returning id",[orderId]);if(changed.rowCount){const rows=await c.query("select product_id,variant_id,quantity from public.order_items where order_id=$1",[orderId]);for(const i of rows.rows){if(i.variant_id){await c.query("update public.product_variants set stock=stock+$1,updated_at=now() where id=$2",[i.quantity,i.variant_id]);await c.query("update public.products set stock=coalesce((select sum(stock) from public.product_variants where product_id=$1 and active=true),0),updated_at=now() where id=$1",[i.product_id]);}else await c.query("update public.products set stock=stock+$1,updated_at=now() where id=$2",[i.quantity,i.product_id]);}}await c.query("commit");}
   catch(e){await c.query("rollback");console.error("[orders] stock restore failed:",e.code||"unknown");}finally{c.release();}
 }
 
@@ -155,12 +186,17 @@ app.get("/auth/google/callback",asyncRoute(async(req,res)=>{
 app.post("/api/auth/logout",asyncRoute(async(req,res)=>{const token=readCookie(req,COOKIE);if(token)await pool.query("delete from public.sessions where token_hash=$1",[hash(token)]);clearCookie(res);res.json({message:"Signed out."});}));
 app.get("/api/auth/me",auth,(req,res)=>res.json({user:cleanUser(req.user)}));
 
-app.get("/api/products",asyncRoute(async(req,res)=>{const r=await pool.query("select p.id,p.name,p.description,p.price,p.image,p.images,p.slug,p.sku,p.category,p.audience,p.stock,p.status,p.featured,p.created_at,coalesce(rv.average_rating,0)::numeric(3,2) as average_rating,coalesce(rv.review_count,0)::int as review_count,coalesce(sales.popularity,0)::int as popularity from public.products p left join (select product_id,round(avg(rating)::numeric,2) as average_rating,count(*) as review_count from public.product_reviews group by product_id) rv on rv.product_id=p.id left join (select oi.product_id,sum(oi.quantity) as popularity from public.order_items oi join public.orders o on o.id=oi.order_id where o.payment_status='paid' group by oi.product_id) sales on sales.product_id=p.id where p.status='active' and p.stock>0 order by p.featured desc,p.created_at desc,p.id desc");res.json(r.rows.map(cleanProduct));}));
+app.get("/api/products",asyncRoute(async(req,res)=>{const r=await pool.query("select p.id,p.name,p.description,p.price,p.image,p.images,p.slug,p.sku,p.category,p.audience,p.stock,p.status,p.featured,p.created_at,coalesce(rv.average_rating,0)::numeric(3,2) as average_rating,coalesce(rv.review_count,0)::int as review_count,coalesce(sales.popularity,0)::int as popularity from public.products p left join (select product_id,round(avg(rating)::numeric,2) as average_rating,count(*) as review_count from public.product_reviews group by product_id) rv on rv.product_id=p.id left join (select oi.product_id,sum(oi.quantity) as popularity from public.order_items oi join public.orders o on o.id=oi.order_id where o.payment_status='paid' group by oi.product_id) sales on sales.product_id=p.id where p.status='active' and p.stock>0 order by p.featured desc,p.created_at desc,p.id desc");const variants=await getVariantsForProducts(r.rows.map(x=>x.id));res.json(r.rows.map(p=>{
+ const productVariants=variants.get(Number(p.id))||[];
+ const variantImages=productVariants.flatMap(colour=>[colour.frontImage,colour.backImage]).filter(isHttpUrl);
+ const images=[...new Set([...(Array.isArray(p.images)?p.images:(p.image?[p.image]:[])),...variantImages].filter(isHttpUrl))];
+ return {...cleanProduct({...p,image:p.image||images[0]||null,images}),variants:productVariants};
+}));}));
 
 app.get("/api/products/:id/reviews",asyncRoute(async(req,res)=>{const id=Number(req.params.id);if(!Number.isInteger(id)||id<1)return res.status(400).json({error:"Invalid product."});const r=await pool.query("select pr.rating,pr.title,pr.body,pr.created_at,exists(select 1 from public.order_items oi join public.orders o on o.id=oi.order_id where oi.product_id=pr.product_id and o.user_id=pr.user_id and o.payment_status='paid') as verified_purchase,split_part(u.name,' ',1) as customer_name from public.product_reviews pr join public.users u on u.id=pr.user_id where pr.product_id=$1 order by pr.created_at desc limit 50",[id]);res.json({reviews:r.rows});}));
 app.post("/api/products/:id/reviews",auth,asyncRoute(async(req,res)=>{const id=Number(req.params.id),rating=Number(req.body?.rating),title=String(req.body?.title||"").trim(),body=String(req.body?.body||"").trim();if(!Number.isInteger(id)||id<1||!Number.isInteger(rating)||rating<1||rating>5||!validText(body,1500)||title.length>100)return res.status(400).json({error:"Choose a rating and write a review of up to 1,500 characters."});const product=await pool.query("select id from public.products where id=$1 and status='active'",[id]);if(!product.rowCount)return res.status(404).json({error:"Product not found."});try{await pool.query("insert into public.product_reviews(product_id,user_id,rating,title,body) values($1,$2,$3,$4,$5)",[id,req.user.id,rating,title||null,body]);res.status(201).json({message:"Thank you. Your review has been published."})}catch(e){if(e.code==="23505")return res.status(409).json({error:"You have already reviewed this product."});throw e}}));
 
-const listProducts=async()=>{const r=await pool.query("select id,name,description,price,image,images,slug,sku,category,audience,stock,status,featured,created_at from public.products order by created_at desc,id desc");return r.rows.map(cleanProduct);};
+const listProducts=async()=>{const r=await pool.query("select id,name,description,price,image,images,slug,sku,category,audience,stock,status,featured,created_at from public.products order by created_at desc,id desc");const variants=await getVariantsForProducts(r.rows.map(x=>x.id));return r.rows.map(p=>({...cleanProduct(p),variants:variants.get(Number(p.id))||[]}));};
 app.get(["/api/admin/products","/api/seller/products"],auth,adminOnly,asyncRoute(async(req,res)=>res.json(await listProducts())));
 app.post(["/api/admin/products","/api/seller/products"],auth,adminOnly,asyncRoute(async(req,res)=>{
   const {name,description,price,image,images,stock=0,category="Essentials",audience="Unisex",sku=null,featured=false,status="active"}=req.body||{},p=Number(price),q=Number(stock),gallery=Array.isArray(images)?images:(image?[image]:[]),primary=gallery[0]||image;
@@ -177,8 +213,34 @@ app.patch(["/api/admin/products/:id","/api/seller/products/:id"],auth,adminOnly,
   if(!validText(n.name,120)||!validText(n.description,2000)||!Number.isFinite(Number(n.price))||Number(n.price)<0||!validText(primary,2000)||!gallery.length||gallery.length>8||gallery.some(u=>!validText(u,2000)||!/^https:\/\//i.test(u))||!Number.isInteger(Number(n.stock))||Number(n.stock)<0||!validText(n.category,60)||!["Men","Women","Unisex"].includes(n.audience)||!["draft","active","archived"].includes(n.status))return res.status(400).json({error:"Invalid product details."});
   const r=await pool.query("update public.products set name=$1,description=$2,price=$3,image=$4,images=$5::jsonb,stock=$6,category=$7,audience=$8,featured=$9,status=$10,sku=$11,updated_at=now() where id=$12 returning *",[n.name.trim(),n.description.trim(),Number(n.price),primary,JSON.stringify(gallery),Number(n.stock),n.category.trim(),n.audience,Boolean(n.featured),n.status,n.sku||null,id]);res.json({product:cleanProduct(r.rows[0]),message:"Product updated."});
 }));
+app.put("/api/admin/products/:id/variants",auth,adminOnly,asyncRoute(async(req,res)=>{
+  const productId=Number(req.params.id),variants=req.body?.variants;
+  if(!Number.isSafeInteger(productId)||productId<1||!Array.isArray(variants)||variants.length>100)return res.status(400).json({error:"Provide up to 100 product variants."});
+  const seen=new Set();
+  for(const v of variants){const colour=String(v.colour||"").trim(),size=String(v.size||"").trim(),sku=String(v.sku||"").trim(),stock=Number(v.stock),adjustment=Number(v.priceAdjustment||0);if(!validText(colour,50)||!validText(size,30)||!validText(sku,80)||!Number.isInteger(stock)||stock<0||!Number.isFinite(adjustment)||adjustment<0||seen.has(sku.toLowerCase()))return res.status(400).json({error:"Each variant needs a unique SKU, colour, size and non-negative stock."});seen.add(sku.toLowerCase());for(const url of [v.frontImage,v.backImage].filter(Boolean)){if(!validText(url,2000)||!/^https:\/\//i.test(url))return res.status(400).json({error:"Variant images must be valid HTTPS URLs."});}}
+  const c=await pool.connect();
+  try{
+    await c.query("begin");
+    const product=await c.query("select id from public.products where id=$1 for update",[productId]);
+    if(!product.rowCount){await c.query("rollback");return res.status(404).json({error:"Product not found."});}
+    for(const v of variants){
+      const colour=String(v.colour).trim(),size=String(v.size).trim(),sku=String(v.sku).trim(),stock=Number(v.stock),adjustment=Number(v.priceAdjustment||0);
+      const saved=await c.query("insert into public.product_variants(product_id,sku,size,colour,stock,price_adjustment,active) values($1,$2,$3,$4,$5,$6,true) on conflict(sku) do update set size=excluded.size,colour=excluded.colour,stock=excluded.stock,price_adjustment=excluded.price_adjustment,active=true,updated_at=now() where public.product_variants.product_id=excluded.product_id returning id",[productId,sku,size,colour,stock,adjustment]);
+      if(!saved.rowCount)throw Object.assign(Error("SKU "+sku+" already belongs to another product."),{status:409});
+      const variantId=Number(saved.rows[0].id);
+      await c.query("delete from public.product_images where variant_id=$1",[variantId]);
+      for(const [viewType,url] of [["front",v.frontImage],["back",v.backImage]])if(url)await c.query("insert into public.product_images(product_id,variant_id,image_url,alt_text,view_type,sort_order,is_primary) values($1,$2,$3,$4,$5,$6,$7)",[productId,variantId,url,colour+" "+viewType,viewType,viewType==="front"?0:1,viewType==="front"]);
+    }
+    if(variants.length){await c.query("update public.product_variants set active=false,updated_at=now() where product_id=$1 and sku<>all($2::text[])",[productId,variants.map(v=>String(v.sku).trim())]);}
+    else await c.query("update public.product_variants set active=false,updated_at=now() where product_id=$1",[productId]);
+    if(variants.length)await c.query("update public.products set stock=coalesce((select sum(stock) from public.product_variants where product_id=$1 and active=true),0),updated_at=now() where id=$1",[productId]);
+    await c.query("commit");
+    const grouped=await getVariantsForProducts([productId]);
+    res.json({variants:grouped.get(productId)||[],message:"Variant inventory saved."});
+  }catch(e){await c.query("rollback");if(e.status)return res.status(e.status).json({error:e.message});if(e.code==="23505")return res.status(409).json({error:"A variant SKU is already in use."});throw e;}finally{c.release();}
+}));
 app.delete(["/api/admin/products/:id","/api/seller/products/:id"],auth,adminOnly,asyncRoute(async(req,res)=>{const r=await pool.query("update public.products set status='archived',stock=0,updated_at=now() where id=$1 and status<>'archived' returning id",[Number(req.params.id)]);if(!r.rowCount)return res.status(404).json({error:"Product not found."});res.json({message:"Product archived."});}));
-app.get(["/api/admin/orders","/api/seller/orders"],auth,adminOnly,asyncRoute(async(req,res)=>{const r=await pool.query("select o.id,o.status,o.payment_status,o.total,o.created_at,c.name customer_name,c.email customer_email,oi.product_id,oi.quantity,oi.unit_price,coalesce(oi.product_name,p.name) product_name from public.orders o join public.customers c on c.id=o.customer_id join public.order_items oi on oi.order_id=o.id left join public.products p on p.id=oi.product_id order by o.created_at desc,o.id desc");res.json(r.rows.map(x=>({...x,id:Number(x.id),product_id:Number(x.product_id),quantity:Number(x.quantity),total:Number(x.total),unit_price:Number(x.unit_price)})));}));
+app.get(["/api/admin/orders","/api/seller/orders"],auth,adminOnly,asyncRoute(async(req,res)=>{const r=await pool.query("select o.id,o.status,o.payment_status,o.total,o.created_at,c.name customer_name,c.email customer_email,oi.product_id,oi.variant_label,oi.quantity,oi.unit_price,coalesce(oi.product_name,p.name) product_name from public.orders o join public.customers c on c.id=o.customer_id join public.order_items oi on oi.order_id=o.id left join public.products p on p.id=oi.product_id order by o.created_at desc,o.id desc");res.json(r.rows.map(x=>({...x,id:Number(x.id),product_id:Number(x.product_id),quantity:Number(x.quantity),total:Number(x.total),unit_price:Number(x.unit_price)})));}));
 
 app.post("/api/checkout",asyncRoute(async(req,res)=>{
   const {customer={},items,accountMode="guest",password}=req.body||{},name=String(customer.name||"").trim(),email=String(customer.email||"").trim().toLowerCase(),phone=String(customer.phone||"").trim(),address=String(customer.address||"").trim();
@@ -191,12 +253,12 @@ app.post("/api/checkout",asyncRoute(async(req,res)=>{
     if(accountMode==="signup"){if(ADMIN_EMAIL&&email===ADMIN_EMAIL)throw Object.assign(Error("The store administrator must use verified Google sign-in."),{status:403});if(user)throw Object.assign(Error("You are already signed in."),{status:400});const r=await c.query("insert into public.users(name,email,password_hash,role) values($1,$2,$3,'customer') returning id,name,email,role,created_at",[name,email,passwordHash(password)]);user=r.rows[0];sessionToken=await createSession(c,user.id);}
     if(accountMode==="login"){const r=await c.query("select id,name,email,password_hash,role,created_at from public.users where lower(email)=lower($1) limit 1 for update",[email]);const u=r.rows[0];if(!u||!passwordMatches(password,u.password_hash))throw Object.assign(Error("Email or password is incorrect."),{status:401});user=u;sessionToken=await createSession(c,u.id);}
     if(user&&String(user.email).toLowerCase()!==email)throw Object.assign(Error("Use the email address linked to your account."),{status:400});
-    const quantities=new Map();for(const item of items){const id=Number(item.id),q=Number(item.quantity);if(!Number.isSafeInteger(id)||!Number.isInteger(q)||q<1||q>99)throw Object.assign(Error("Invalid item in your bag."),{status:400});quantities.set(id,(quantities.get(id)||0)+q);}
-    const verified=[];for(const [id,q] of quantities){const r=await c.query("select id,name,price,stock,status from public.products where id=$1 for update",[id]);const p=r.rows[0];if(!p||p.status!=="active")throw Object.assign(Error("A product in your bag is no longer available."),{status:409});if(Number(p.stock)<q)throw Object.assign(Error("Not enough stock for "+p.name+". Available: "+p.stock+"."),{status:409});total+=Number(p.price)*q;verified.push({p,q});}
+    const quantities=new Map();for(const item of items){const id=Number(item.id),variantId=item.variantId==null?null:Number(item.variantId),q=Number(item.quantity);if(!Number.isSafeInteger(id)||!Number.isInteger(q)||q<1||q>99||(variantId!==null&&!Number.isSafeInteger(variantId)))throw Object.assign(Error("Invalid item in your bag."),{status:400});const key=variantId===null?"p:"+id:"v:"+variantId,old=quantities.get(key);quantities.set(key,{id,variantId,q:(old?.q||0)+q});}
+    const verified=[];for(const item of quantities.values()){const {id,variantId,q}=item;let p,variant=null;if(variantId!==null){const r=await c.query("select p.id,p.name,p.price,p.status,v.id variant_id,v.sku,v.size,v.colour,v.stock,v.price_adjustment from public.product_variants v join public.products p on p.id=v.product_id where v.id=$1 and v.product_id=$2 and v.active=true for update of v,p",[variantId,id]);const row=r.rows[0];if(!row||row.status!=="active")throw Object.assign(Error("A selected colour or size is no longer available."),{status:409});p={id:Number(row.id),name:row.name,price:Number(row.price),status:row.status};variant={id:Number(row.variant_id),sku:row.sku,size:row.size,colour:row.colour,stock:Number(row.stock),priceAdjustment:Number(row.price_adjustment||0)};if(variant.stock<q)throw Object.assign(Error("Not enough stock for "+p.name+" in "+variant.colour+" / "+variant.size+". Available: "+variant.stock+"."),{status:409});}else{const r=await c.query("select id,name,price,stock,status from public.products where id=$1 for update",[id]);p=r.rows[0];if(!p||p.status!=="active")throw Object.assign(Error("A product in your bag is no longer available."),{status:409});if(Number(p.stock)<q)throw Object.assign(Error("Not enough stock for "+p.name+". Available: "+p.stock+"."),{status:409});p={...p,id:Number(p.id),price:Number(p.price),stock:Number(p.stock)};}const unitPrice=p.price+(variant?.priceAdjustment||0);total+=unitPrice*q;verified.push({p,q,variant,unitPrice});}
     const customerRow=await c.query("insert into public.customers(name,email,address,phone) values($1,$2,$3,$4) on conflict(email) do update set name=excluded.name,address=excluded.address,phone=excluded.phone returning id",[name,email,address,phone||null]);
     guestToken=user?null:crypto.randomBytes(32).toString("base64url");
     const order=await c.query("insert into public.orders(customer_id,user_id,total,status,payment_status,shipping_name,shipping_email,shipping_phone,shipping_address,guest_token_hash) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id",[customerRow.rows[0].id,user?user.id:null,total,payReady()?"pending_payment":"placed",payReady()?"pending":"unpaid",name,email,phone||null,address,guestToken?hash(guestToken):null]);orderId=Number(order.rows[0].id);
-    for(const x of verified){await c.query("insert into public.order_items(order_id,product_id,quantity,unit_price,product_name) values($1,$2,$3,$4,$5)",[orderId,x.p.id,x.q,x.p.price,x.p.name]);const dec=await c.query("update public.products set stock=stock-$1,updated_at=now() where id=$2 and stock >= $1",[x.q,x.p.id]);if(!dec.rowCount)throw Object.assign(Error("Stock changed while checking out. Please review your bag."),{status:409});}
+    for(const x of verified){const label=x.variant?[x.variant.colour,x.variant.size].filter(Boolean).join(" / "):null;await c.query("insert into public.order_items(order_id,product_id,variant_id,variant_label,quantity,unit_price,product_name) values($1,$2,$3,$4,$5,$6,$7)",[orderId,x.p.id,x.variant?.id||null,label,x.q,x.unitPrice,x.p.name]);if(x.variant){const dec=await c.query("update public.product_variants set stock=stock-$1,updated_at=now() where id=$2 and stock >= $1",[x.q,x.variant.id]);if(!dec.rowCount)throw Object.assign(Error("Variant stock changed while checking out. Please review your bag."),{status:409});await c.query("update public.products set stock=coalesce((select sum(stock) from public.product_variants where product_id=$1 and active=true),0),updated_at=now() where id=$1",[x.p.id]);}else{const dec=await c.query("update public.products set stock=stock-$1,updated_at=now() where id=$2 and stock >= $1",[x.q,x.p.id]);if(!dec.rowCount)throw Object.assign(Error("Stock changed while checking out. Please review your bag."),{status:409});}}
     await c.query("commit");if(sessionToken)setCookie(res,sessionToken);
     if(payReady()){try{const p=await startPayment(orderId,total);return res.status(201).json({message:"Continue to secure payment.",orderId,total,checkoutUrl:p.redirectUrl,accountCreated:accountMode==="signup"});}catch(e){await restoreOrder(orderId);throw Object.assign(Error("We couldn't start payment. No payment was taken and reserved stock has been released."),{status:502});}}
     return res.status(201).json({message:"Your order has been received. Payment is pending confirmation by STND.",orderId,total,checkoutUrl:null,orderStatus:"placed",guestAccessToken:guestToken,accountCreated:accountMode==="signup"});

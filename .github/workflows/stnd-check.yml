@@ -2,7 +2,7 @@ name: STND checks
 
 on:
   push:
-    branches: [stnd-postgres-migration]
+    branches: [stnd-clothing-rack]
   pull_request:
     branches: [main]
 
