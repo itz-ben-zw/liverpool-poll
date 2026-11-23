@@ -1,7 +1,9 @@
 const express = require("express");
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite";
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const SYSTEM_INSTRUCTIONS = [
   "You are the STND. shopping and customer-support assistant for a contemporary fashion store.",
   "Your voice is calm, concise, warm, confident and fashion-aware. Avoid hard selling.",
@@ -18,27 +20,137 @@ const SYSTEM_INSTRUCTIONS = [
   "Return only the JSON object required by the response schema. Keep the reply helpful and reasonably brief."
 ].join("\n");
 
-const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite";
-const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+const responseSchema = {
+  type: "object",
+  properties: {
+    reply: { type: "string" },
+    productIds: { type: "array", items: { type: "integer" } },
+    intent: { type: "string", enum: ["shopping", "support", "general"] }
+  },
+  required: ["reply", "productIds", "intent"]
+};
 
 async function requestGemini(model, prompt, apiKey) {
   let lastResult;
   let lastError;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (attempt > 0) await new Promise(resolve => setTimeout(resolve, 500 * (2 ** (attempt - 1))));
+    if (attempt > 0) {
+      await new Promise(resolve => setTimeout(resolve, 500 * (2 ** (attempt - 1))));
+    }
 
     try {
-      let result = await requestGemini(MODEL, prompt, apiKey);
-      if ((!result || result.error || !result.response?.ok) &&
-          (result?.error || RETRYABLE_STATUSES.has(result?.response?.status)) &&
-          FALLBACK_MODEL && FALLBACK_MODEL !== MODEL) {
-        console.warn("[assistant] Falling back to secondary Gemini model:", FALLBACK_MODEL);
-        result = await requestGemini(FALLBACK_MODEL, prompt, apiKey);
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey
+        },
+        body: JSON.stringify({
+          model,
+          store: false,
+          system_instruction: SYSTEM_INSTRUCTIONS,
+          input: prompt,
+          response_format: {
+            type: "text",
+            mime_type: "application/json",
+            schema: responseSchema
+          }
+        }),
+        signal: AbortSignal.timeout(25000)
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      lastResult = { response, payload, model };
+      if (response.ok || !RETRYABLE_STATUSES.has(response.status)) return lastResult;
+
+      console.warn("[assistant] Gemini model temporarily unavailable:", model, response.status, "attempt", attempt + 1);
+    } catch (error) {
+      lastError = error;
+      console.warn("[assistant] Gemini transport attempt failed:", model, error.name || "request error", "attempt", attempt + 1);
+    }
+  }
+
+  return lastResult || { error: lastError, model };
+}
+
+module.exports = function createAssistantRouter(pool) {
+  const router = express.Router();
+  const rateLimits = new Map();
+  const WINDOW_MS = 10 * 60 * 1000;
+  const MAX_REQUESTS = 10;
+
+  router.post("/chat", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: "The STND. assistant is not configured yet. Please contact the store team." });
+
+    const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+    if (!message || message.length > 600) {
+      return res.status(400).json({ error: "Please enter a message of 1 to 600 characters." });
+    }
+
+    const ip = req.ip || req.socket?.remoteAddress || "unknown";
+    const now = Date.now();
+    const recent = (rateLimits.get(ip) || []).filter(time => now - time < WINDOW_MS);
+    if (recent.length >= MAX_REQUESTS) {
+      res.set("Retry-After", String(Math.ceil((WINDOW_MS - (now - recent[0])) / 1000)));
+      return res.status(429).json({ error: "You've sent quite a few messages. Please wait a little before trying again." });
+    }
+    recent.push(now);
+    rateLimits.set(ip, recent);
+    if (rateLimits.size > 1000) {
+      for (const [key, times] of rateLimits) {
+        if (!times.some(time => now - time < WINDOW_MS)) rateLimits.delete(key);
+      }
+    }
+
+    const history = Array.isArray(req.body?.history) ? req.body.history.slice(-8) : [];
+    const safeHistory = history
+      .filter(item => item && ["user", "model"].includes(item.role) && typeof item.text === "string")
+      .map(item => ({ role: item.role, text: item.text.trim().slice(0, 800) }))
+      .filter(item => item.text);
+
+    try {
+      const result = await pool.query(
+        "select id,name,description,price,image,images,slug,category,audience,stock from public.products where status='active' and stock>0 order by featured desc,created_at desc,id desc limit 40"
+      );
+      const products = result.rows.map(product => ({
+        id: Number(product.id),
+        name: product.name,
+        description: String(product.description || "").slice(0, 500),
+        price: Number(product.price),
+        image: product.image || (Array.isArray(product.images) ? product.images[0] : null),
+        slug: product.slug,
+        category: product.category,
+        audience: product.audience,
+        stock: Number(product.stock)
+      }));
+      const catalogue = JSON.stringify(products);
+      const transcript = safeHistory.map(item => (item.role === "user" ? "SHOPPER" : "STND ASSISTANT") + ": " + item.text).join("\n");
+      const prompt = [
+        "CURRENT LIVE PRODUCT CATALOGUE (authoritative; JSON data):",
+        catalogue,
+        "",
+        "RECENT CONVERSATION:",
+        transcript || "(No earlier messages.)",
+        "",
+        "SHOPPER'S NEW MESSAGE:",
+        message
+      ].join("\n");
+
+      let resultFromGemini = await requestGemini(MODEL, prompt, apiKey);
+      const shouldFallback = !resultFromGemini ||
+        resultFromGemini.error ||
+        (!resultFromGemini.response?.ok && RETRYABLE_STATUSES.has(resultFromGemini.response.status));
+
+      if (shouldFallback && FALLBACK_MODEL && FALLBACK_MODEL !== MODEL) {
+        console.warn("[assistant] Switching to fallback Gemini model:", FALLBACK_MODEL);
+        resultFromGemini = await requestGemini(FALLBACK_MODEL, prompt, apiKey);
       }
 
-      if (!result || result.error || !result.response) {
-        const error = result?.error || new Error("Gemini request failed");
+      if (!resultFromGemini || resultFromGemini.error || !resultFromGemini.response) {
+        const error = resultFromGemini?.error || new Error("Gemini request failed");
         console.error("[assistant] Gemini request failed after retries:", error.name || error.code || "transport error");
         return res.status(502).json({
           error: error.name === "TimeoutError"
@@ -47,7 +159,7 @@ async function requestGemini(model, prompt, apiKey) {
         });
       }
 
-      const { response, payload } = result;
+      const { response, payload } = resultFromGemini;
       if (!response.ok) {
         console.error("[assistant] Gemini request failed after fallback:", response.status, payload.error?.status || "provider error");
         return res.status(response.status === 429 ? 503 : 502).json({
