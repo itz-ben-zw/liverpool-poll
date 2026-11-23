@@ -17,6 +17,8 @@ Browser chat widget
   <- reply + validated product records
 ```
 
+The API retries temporary provider failures with exponential backoff, then switches to the fallback Gemini model when the primary model remains overloaded or times out. Authentication and invalid-request errors are not retried or masked by a model switch.
+
 The browser never receives the Gemini API key. The assistant reads only active, in-stock product records. Product IDs returned by Gemini are checked against that catalogue before the API sends product cards to the browser.
 
 ## Render environment variables
@@ -24,7 +26,8 @@ The browser never receives the Gemini API key. The assistant reads only active, 
 Add these to the existing STND web service:
 
 - `GEMINI_API_KEY`: key created in Google AI Studio. Keep it server-side.
-- `GEMINI_MODEL`: optional; defaults to `gemini-3.8-flash`.
+- `GEMINI_MODEL`: optional primary model; defaults to `gemini-3.8-flash`.
+- `GEMINI_FALLBACK_MODEL`: optional fallback model; defaults to `gemini-3.5-flash-lite`.
 
 No Supabase schema change or new database is required.
 
