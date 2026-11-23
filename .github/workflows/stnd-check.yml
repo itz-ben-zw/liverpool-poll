@@ -2,7 +2,7 @@ name: STND checks
 
 on:
   push:
-    branches: [stnd-postgres-migration]
+    branches: [stnd-postgres-migration, feature/ai-assistant]
   pull_request:
     branches: [main]
 
