@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "db:check": "node db-check.js",
-    "check": "node --check server.js && node scripts/check-inline-js.js"
+    "check": "node --check server.js && node --check ai-assistant.js && node --check public/ai-assistant.js && node scripts/check-inline-js.js"
   },
   "engines": {
     "node": ">=22.5.0"
